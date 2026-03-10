@@ -10,3 +10,7 @@
 # Temporary
 last-touched
 *.tmp
+
+# br (beads_rust) internal runtime directories — machine-specific, ephemeral
+.br_history/
+.br_recovery/
