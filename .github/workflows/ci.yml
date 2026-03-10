@@ -56,15 +56,8 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: dist-${{ github.sha }}
-      - name: Run unit tests with coverage
-        run: npx vitest run test/unit --coverage --reporter=verbose
-      - name: Upload coverage
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: unit-coverage-${{ github.sha }}
-          path: coverage/
-          retention-days: 14
+      - name: Run unit tests
+        run: npx vitest run test/unit --reporter=verbose
 
   # ── Stage 3: Contract Tests (HTTP/WS shape contracts, no VPS) ────────────────
   contract:

@@ -166,7 +166,13 @@ describe("ssh.yaml config persistence (no interactive prompts)", () => {
   });
 
   it("providers.yaml is separate from ssh.yaml (not merged)", () => {
-    writeFileSync(join(dir.path, "ssh.yaml"), yaml.dump(FIXTURE_SSH_CONFIG), "utf8");
+    const keyPath = join(dir.path, "id_ed25519");
+    writeFileSync(keyPath, "test-key-material", { encoding: "utf8", mode: 0o600 });
+    writeFileSync(
+      join(dir.path, "ssh.yaml"),
+      yaml.dump({ ...FIXTURE_SSH_CONFIG, key_path: keyPath }),
+      "utf8"
+    );
     writeFileSync(join(dir.path, "providers.yaml"), yaml.dump(FIXTURE_PROVIDERS_CONFIG), "utf8");
 
     // Both files exist independently
