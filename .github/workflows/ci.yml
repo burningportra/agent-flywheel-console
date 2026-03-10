@@ -1,0 +1,221 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "feat/**", "fix/**"]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "20"
+  NO_COLOR: "1"
+
+jobs:
+  # ── Stage 1: Type-check + Build ──────────────────────────────────────────────
+  build:
+    name: Type-check & Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm run build:dashboard
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ github.sha }}
+          path: |
+            dist/
+            dashboard/dist/
+          retention-days: 7
+
+  # ── Stage 2: Unit Tests (fast, no I/O) ──────────────────────────────────────
+  unit:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    needs: build
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: Download build
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-${{ github.sha }}
+      - name: Run unit tests with coverage
+        run: npx vitest run test/unit --coverage --reporter=verbose
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-coverage-${{ github.sha }}
+          path: coverage/
+          retention-days: 14
+
+  # ── Stage 3: Contract Tests (HTTP/WS shape contracts, no VPS) ────────────────
+  contract:
+    name: Contract Tests
+    runs-on: ubuntu-latest
+    needs: build
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: Download build
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-${{ github.sha }}
+      - name: Run contract tests
+        run: npx vitest run test/contract --reporter=verbose
+
+  # ── Stage 4: Integration Tests (real processes, temp dirs, no VPS) ──────────
+  integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: build
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: Download build
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-${{ github.sha }}
+      - name: Run integration tests
+        # --retry 1: allows a single retry per test to catch transient flakes
+        # (process startup timing, port allocation). Consistent failures are real.
+        run: npx vitest run test/integration --testTimeout 30000 --retry 1 --reporter=verbose
+
+  # ── Stage 5: Local E2E Tests (real binary, HOME-isolated, no VPS) ────────────
+  e2e-local:
+    name: E2E Local (no VPS)
+    runs-on: ubuntu-latest
+    needs: build
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: Download build
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-${{ github.sha }}
+      - name: Run local E2E tests
+        # Covers local-commands (binary smoke), error-matrix (config/arg validation),
+        # and concurrent (SQLite WAL mode) — all no-VPS, no-SSH required.
+        run: |
+          npx vitest run \
+            test/e2e/local-commands.e2e.ts \
+            test/e2e/error-matrix \
+            test/e2e/concurrent \
+            --testTimeout 30000 --retry 1 --reporter=verbose
+
+  # ── Stage 6: VPS E2E Tests (opt-in, requires SSH secret) ────────────────────
+  #
+  # Runs only on push to main when FLYWHEEL_VPS_HOST repo variable is set.
+  # Configure via: Settings → Secrets and variables → Actions → Variables.
+  #
+  e2e-vps:
+    name: E2E VPS (real orchestration)
+    runs-on: ubuntu-latest
+    needs: [unit, contract, integration, e2e-local]
+    timeout-minutes: 30
+    if: |
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
+      vars.FLYWHEEL_VPS_HOST != ''
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: Download build
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-${{ github.sha }}
+      - name: Configure SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.FLYWHEEL_SSH_KEY }}" > ~/.ssh/flywheel_ed25519
+          chmod 600 ~/.ssh/flywheel_ed25519
+          ssh-keyscan -H "${{ vars.FLYWHEEL_VPS_HOST }}" >> ~/.ssh/known_hosts
+      - name: Write flywheel ssh.yaml
+        run: |
+          mkdir -p ~/.flywheel
+          cat > ~/.flywheel/ssh.yaml <<EOF
+          host: ${{ vars.FLYWHEEL_VPS_HOST }}
+          user: ${{ vars.FLYWHEEL_VPS_USER || 'ubuntu' }}
+          port: 22
+          key_path: ~/.ssh/flywheel_ed25519
+          remote_repo_root: ${{ vars.FLYWHEEL_REMOTE_REPO_ROOT || '/home/ubuntu/projects' }}
+          EOF
+      - name: Run VPS E2E tests
+        env:
+          FLYWHEEL_TEST_E2E: "1"
+        run: npm run test:e2e -- --testTimeout 60000 --reporter=verbose
+      - name: Upload VPS E2E transcript
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-vps-logs-${{ github.sha }}
+          path: |
+            /tmp/flywheel-test-*/
+          retention-days: 30
+
+  # ── Stage 7: Full coverage gate (merged, final gate for PRs) ─────────────────
+  #
+  # Runs the complete non-VPS test suite and enforces the coverage thresholds
+  # defined in vitest.config.ts. This is the required status check for merging.
+  #
+  coverage-gate:
+    name: Coverage Gate
+    runs-on: ubuntu-latest
+    needs: [unit, contract, integration, e2e-local]
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: Download build
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-${{ github.sha }}
+      - name: Run full suite with coverage enforcement
+        run: npm run test:coverage -- --testTimeout 30000 --reporter=dot
+      - name: Upload merged coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-full-${{ github.sha }}
+          path: coverage/
+          retention-days: 30
