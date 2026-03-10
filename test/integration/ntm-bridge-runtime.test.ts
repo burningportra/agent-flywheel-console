@@ -174,6 +174,43 @@ describe("NtmBridge.activity() — pane status derivation", () => {
       noExistBin.cleanup();
     }
   });
+
+  it("clears stale idle snapshots when a session disappears and later returns", async () => {
+    const responses = [
+      {
+        exists: true,
+        session: "s",
+        generated_at: "2026-01-01T00:00:00Z",
+        panes: [{ index: 0, title: "same-title", type: "claude", active: false, command: "claude" }],
+      },
+      { exists: false, session: "s", panes: null },
+      {
+        exists: true,
+        session: "s",
+        generated_at: "2026-01-01T00:00:10Z",
+        panes: [{ index: 0, title: "same-title", type: "claude", active: false, command: "claude" }],
+      },
+    ];
+
+    const ntm = new NtmBridge({
+      runRemote: async () => {
+        const response = responses.shift();
+        if (!response) {
+          throw new Error("Unexpected extra runRemote() call in idle snapshot reset test.");
+        }
+        return {
+          stdout: JSON.stringify(response),
+          stderr: "",
+          exitCode: 0,
+          duration: 0,
+        };
+      },
+    } as unknown as RemoteCommandRunner);
+
+    expect((await ntm.activity("s"))[0].status).toBe("idle");
+    expect(await ntm.activity("s")).toEqual([]);
+    expect((await ntm.activity("s"))[0].status).toBe("idle");
+  });
 });
 
 // ── NtmBridge.pause() ────────────────────────────────────────────────────────

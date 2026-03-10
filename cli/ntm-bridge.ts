@@ -199,15 +199,18 @@ export class NtmBridge {
     );
 
     if (!response.exists || !response.panes) {
+      this.clearSessionSnapshots(session);
       return [];
     }
 
     const generatedAt = response.generated_at ?? new Date().toISOString();
+    const activeSnapshotKeys = new Set<string>();
 
-    return response.panes.map((pane) => {
+    const statuses = response.panes.map((pane) => {
       const index = pane.index ?? 0;
       const signature = [pane.title ?? "", pane.command ?? "", pane.active ? "1" : "0"].join("|");
       const snapshotKey = `${session}:${index}`;
+      activeSnapshotKeys.add(snapshotKey);
       const previous = this.idleSnapshots.get(snapshotKey);
 
       let unchangedCount = 1;
@@ -224,7 +227,7 @@ export class NtmBridge {
         lastChangedAt,
       });
 
-      const status = pane.active
+      const status: AgentStatus["status"] = pane.active
         ? "active"
         : unchangedCount >= 3
           ? "stuck"
@@ -240,6 +243,9 @@ export class NtmBridge {
         type: pane.type ?? "unknown",
       };
     });
+
+    this.clearMissingPaneSnapshots(session, activeSnapshotKeys);
+    return statuses;
   }
 
   async pause(session: string): Promise<NtmPauseResult> {
@@ -289,6 +295,24 @@ export class NtmBridge {
       );
     }
   }
+
+  private clearSessionSnapshots(session: string): void {
+    const prefix = `${session}:`;
+    for (const key of Array.from(this.idleSnapshots.keys())) {
+      if (key.startsWith(prefix)) {
+        this.idleSnapshots.delete(key);
+      }
+    }
+  }
+
+  private clearMissingPaneSnapshots(session: string, activeSnapshotKeys: Set<string>): void {
+    const prefix = `${session}:`;
+    for (const key of Array.from(this.idleSnapshots.keys())) {
+      if (key.startsWith(prefix) && !activeSnapshotKeys.has(key)) {
+        this.idleSnapshots.delete(key);
+      }
+    }
+  }
 }
 
 function inferSpawnPaneCount(raw: unknown, defaultCount: number, options: NtmSpawnOptions): number {
@@ -332,4 +356,3 @@ function extractCurrentBead(title: string | undefined): string | undefined {
   const match = title.match(/[A-Za-z0-9-]+-[A-Za-z0-9]+(?:\.[0-9]+)?/);
   return match?.[0];
 }
-

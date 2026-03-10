@@ -93,16 +93,17 @@ export async function startLoopbackSsh(
   const tmpBase = mkdtempSync(join(tmpdir(), "flywheel-ssh-test-"));
   mkdirSync(join(tmpBase, "keys"), { recursive: true });
 
-  // Generate host key (server identity)
-  const hostKeyPair = sshUtils.generateKeyPairSync("ed25519");
+  // ED25519 OpenSSH private keys proved flaky under parallel multi-process
+  // test startup in ssh2's parser. RSA 2048 is slower but stable here.
+  const hostKeyPair = sshUtils.generateKeyPairSync("rsa", { bits: 2048 });
   const hostPrivateKey = hostKeyPair.private;
 
   // Generate client key pair (client authenticates with this)
-  const clientKeyPair = sshUtils.generateKeyPairSync("ed25519");
+  const clientKeyPair = sshUtils.generateKeyPairSync("rsa", { bits: 2048 });
   const clientPrivateKey = clientKeyPair.private;
 
   // Write client private key to disk — SSHManager reads it via privateKeyPath
-  const clientKeyPath = join(tmpBase, "keys", "client_ed25519");
+  const clientKeyPath = join(tmpBase, "keys", "client_rsa");
   writeFileSync(clientKeyPath, clientPrivateKey, { mode: 0o600 });
 
   // Current OS username (the server accepts connections from this user)

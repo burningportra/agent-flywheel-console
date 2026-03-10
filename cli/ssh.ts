@@ -120,7 +120,13 @@ export function loadSSHConfig(configPath = getDefaultSSHConfigPath()): SSHConfig
     throw new SSHError(`SSH private key not found at ${keyPath}.`);
   }
 
-  fs.accessSync(keyPath, fs.constants.R_OK);
+  try {
+    fs.accessSync(keyPath, fs.constants.R_OK);
+  } catch (error) {
+    throw new SSHError(`SSH private key is not readable at ${keyPath}.`, {
+      cause: error instanceof Error ? error : undefined,
+    });
+  }
 
   return {
     host,
@@ -249,15 +255,18 @@ export class SSHManager {
 
     return await new Promise<Readable>((resolve, reject) => {
       let settled = false;
+      let channelRef: SSHStreamChannel | null = null;
 
       const abortStream = () => {
         if (!settled) {
           settled = true;
           reject(new SSHError(`SSH stream aborted before start: ${command}`));
-          return;
+        } else {
+          stream.end();
         }
 
-        stream.end();
+        channelRef?.close();
+        channelRef?.destroy();
       };
 
       const onAbort = () => {
@@ -270,6 +279,8 @@ export class SSHManager {
       }
 
       connection.exec(fullCommand, {}, (error: Error | undefined, channel: SSHStreamChannel) => {
+        channelRef = channel;
+
         if (error) {
           settled = true;
           reject(
@@ -282,6 +293,11 @@ export class SSHManager {
 
         if (options.signal) {
           options.signal.addEventListener("abort", onAbort, { once: true });
+        }
+
+        if (options.signal?.aborted) {
+          abortStream();
+          return;
         }
 
         channel.on("data", (chunk: Buffer) => {
@@ -303,17 +319,6 @@ export class SSHManager {
           options.signal?.removeEventListener("abort", onAbort);
           stream.destroy(channelError);
         });
-
-        if (options.signal) {
-          options.signal.addEventListener(
-            "abort",
-            () => {
-              channel.close();
-              channel.destroy();
-            },
-            { once: true }
-          );
-        }
 
         settled = true;
         resolve(stream);

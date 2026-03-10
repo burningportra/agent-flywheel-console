@@ -16,7 +16,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import yaml from "js-yaml";
 import { SSHManager, SSHTimeoutError, SSHError, loadSSHConfig } from "../../cli/ssh.js";
@@ -67,6 +67,35 @@ describe("loadSSHConfig() — config validation failures", () => {
     );
     expect(() => loadSSHConfig(p)).toThrow(SSHError);
     expect(() => loadSSHConfig(p)).toThrow(/not found/i);
+  });
+
+  it("throws SSHError when private key file exists but is not readable", () => {
+    if (process.platform === "win32") {
+      return;
+    }
+
+    const keyPath = join(dir.path, "id_ed25519");
+    writeFileSync(keyPath, "dummy private key");
+
+    const p = join(dir.path, "ssh.yaml");
+    writeFileSync(
+      p,
+      yaml.dump({
+        host: "127.0.0.1",
+        user: "ubuntu",
+        port: 22,
+        key_path: keyPath,
+        remote_repo_root: "/tmp",
+      })
+    );
+
+    try {
+      chmodSync(keyPath, 0o000);
+      expect(() => loadSSHConfig(p)).toThrow(SSHError);
+      expect(() => loadSSHConfig(p)).toThrow(/not readable/i);
+    } finally {
+      chmodSync(keyPath, 0o600);
+    }
   });
 });
 
@@ -145,6 +174,21 @@ describe("SSHManager — loopback connect/disconnect/lifecycle", () => {
     const mgr = new SSHManager(badConfig);
     await expect(mgr.connect()).rejects.toThrow(SSHError);
     badDir.cleanup();
+  });
+
+  it("supports several loopback servers starting in parallel", async () => {
+    const servers = await Promise.all(
+      Array.from({ length: 4 }, () => startLoopbackSsh())
+    );
+    const managers = servers.map((server) => new SSHManager(server.sshConfigPath));
+
+    try {
+      await Promise.all(managers.map((manager) => manager.connect()));
+      expect(managers.every((manager) => manager.isConnected())).toBe(true);
+    } finally {
+      managers.forEach((manager) => manager.disconnect());
+      await Promise.all(servers.map((server) => server.stop()));
+    }
   });
 });
 
