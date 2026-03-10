@@ -13,7 +13,7 @@ import { mkdirSync, writeFileSync, existsSync, readFileSync, statSync } from "no
 import yaml from "js-yaml";
 import { tempDir, FIXTURE_SSH_CONFIG, FIXTURE_PROVIDERS_CONFIG } from "../helpers.js";
 import { initDb, StateManager } from "../../cli/state.js";
-import { loadSshConfig, flywheelDir } from "../../cli/config.js";
+import { loadSshConfig, loadProvidersConfig, flywheelDir } from "../../cli/config.js";
 
 const CLI = resolve("dist/cli.js");
 
@@ -179,9 +179,27 @@ describe("ssh.yaml config persistence (no interactive prompts)", () => {
     expect(existsSync(join(dir.path, "ssh.yaml"))).toBe(true);
     expect(existsSync(join(dir.path, "providers.yaml"))).toBe(true);
 
-    // SSH config doesn't bleed into providers
-    const { stdout } = fly(["doctor"], env());
-    expect(stdout).toMatch(/ssh\.yaml.*✓|✓.*ssh/i);
-    expect(stdout).toMatch(/providers\.yaml.*✓|✓.*provider/i);
+    // Verify each config loads correctly in isolation using the TypeScript API
+    // directly rather than spawning the doctor CLI subprocess.  The doctor's
+    // SSH connectivity check requires a real VPS connection which would time
+    // out in CI; the config-loading logic is what matters here.
+    const savedHome = process.env.FLYWHEEL_HOME;
+    process.env.FLYWHEEL_HOME = dir.path;
+    try {
+      const sshConfig = loadSshConfig();
+      expect(sshConfig.host).toBe(FIXTURE_SSH_CONFIG.host);
+      expect(sshConfig.user).toBe(FIXTURE_SSH_CONFIG.user);
+
+      const providers = loadProvidersConfig();
+      expect(typeof providers.slots).toBe("object");
+      // providers should have no ssh-specific fields
+      expect((providers as Record<string, unknown>).host).toBeUndefined();
+    } finally {
+      if (savedHome === undefined) {
+        delete process.env.FLYWHEEL_HOME;
+      } else {
+        process.env.FLYWHEEL_HOME = savedHome;
+      }
+    }
   });
 });
