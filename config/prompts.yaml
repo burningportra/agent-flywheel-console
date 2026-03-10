@@ -43,6 +43,107 @@ prompts:
     phase: beads
 
   # Phase 3: Swarm
+  swarm-init-briefing:
+    text: |
+      You are joining the active swarm for {project_name}. Read this briefing
+      carefully before touching code.
+
+      Plan summary:
+      {plan_summary}
+
+      Assigned beads:
+      {bead_assignments}
+
+      Non-negotiable commit rules:
+      {commit_rules}
+
+      Operating rules:
+      - Claim work in br before editing.
+      - Check agent mail before starting and whenever blocked.
+      - Coordinate file ownership before touching shared files.
+      - Keep changes scoped to your assigned bead.
+      - If no bead is assigned yet, claim the next ready bead from br and announce it.
+      - If blocked by dependencies or another agent, report it in agent mail immediately.
+
+      Report your first bead, the files you expect to touch, and any blockers in
+      agent mail or your next terminal update.
+    model: any
+    effort: high
+    phase: swarm
+
+  bead-claim:
+    text: |
+      Claim bead {bead_id}: {bead_title}
+
+      Description:
+      {bead_description}
+
+      Dependencies:
+      {dependencies}
+
+      Before editing:
+      1. Verify the dependencies are cleared.
+      2. Mark the bead in progress.
+      3. Reserve or announce the files you intend to change.
+
+      Then start implementing immediately and keep scope tight.
+    model: any
+    effort: medium
+    phase: swarm
+
+  bead-complete:
+    text: |
+      Bead {bead_id} is complete.
+
+      Summary:
+      {summary}
+
+      Files changed:
+      {files_changed}
+
+      Before you stop:
+      - Run the relevant verification.
+      - Update the bead status.
+      - Send agent mail with what changed, risks, and follow-ups.
+      - Pick the next ready bead if time remains.
+    model: any
+    effort: medium
+    phase: swarm
+
+  check-mail:
+    text: |
+      Stop and check agent mail now.
+      - Read every unread message carefully.
+      - Respond to anything that affects your current bead.
+      - Acknowledge direct asks and resolve conflicts before continuing.
+      - If there is no new mail, continue working without extra status noise.
+    model: any
+    effort: low
+    phase: swarm
+
+  resolve-conflict:
+    text: |
+      You need to resolve an active agent conflict.
+
+      Conflict:
+      {conflict_description}
+
+      Agent A position:
+      {agent_a_position}
+
+      Agent B position:
+      {agent_b_position}
+
+      Produce:
+      1. The core disagreement in one sentence.
+      2. The recommended decision and why.
+      3. The concrete next step for each agent.
+
+      Favor the option that reduces coordination cost and preserves momentum.
+    model: opus
+    effort: max
+    phase: swarm
+
   commit-work:
     text: |
       Now, based on your knowledge of the project, commit all changed files with a
