@@ -126,12 +126,12 @@ GitHub Actions (`.github/workflows/ci.yml`) runs these stages on every push/PR:
 | Stage | What | Trigger |
 |-------|------|---------|
 | Type-check & Build | `tsc --noEmit` + esbuild + vite | Always |
-| Unit Tests | `test/unit/**` with coverage | Always |
+| Unit Tests | `test/unit/**` | Always |
 | Contract Tests | `test/contract/**` (HTTP/WS shape) | Always |
 | Integration Tests | `test/integration/**` (real processes) | Always |
 | E2E Local | `test/e2e/local-commands.e2e.ts` | Always |
 | E2E VPS | Full VPS orchestration | Push to `main` + `FLYWHEEL_VPS_HOST` set |
-| Coverage Gate | Merged coverage thresholds (vitest.config.ts) | Always |
+| Coverage Gate | Full non-VPS suite with ratcheted coverage thresholds (vitest.config.ts) | Always |
 
 To enable VPS E2E in CI, set these in repository Settings → Variables/Secrets:
 - `FLYWHEEL_VPS_HOST` — VPS IP or hostname

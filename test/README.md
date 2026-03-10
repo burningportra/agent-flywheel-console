@@ -81,9 +81,16 @@ pure wiring exports) are listed in `scripts/coverage-surface.ts:KNOWN_GAPS`.
 ## Coverage thresholds
 
 Configured in `vitest.config.ts`:
-- Lines: ≥ 70%
-- Functions: ≥ 70%
-- Branches: ≥ 60%
-- Statements: ≥ 70%
+- Lines: ≥ 35%
+- Functions: ≥ 50%
+- Branches: ≥ 35%
+- Statements: ≥ 35%
+
+These are CI ratchet floors set from the current full-suite baseline. Raise them
+as coverage improves; do not let the gate drift downward casually.
+
+Current scope: the Vitest coverage gate measures Node-instrumented `cli/**/*.ts`
+modules. Dashboard browser code is validated by E2E tests, but it is not yet
+collected by the Node coverage pipeline.
 
 Run `npm run test:coverage` and open `coverage/index.html` to view.

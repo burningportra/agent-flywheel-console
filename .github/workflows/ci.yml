@@ -52,19 +52,8 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
       - run: npm ci
-      - name: Download build
-        uses: actions/download-artifact@v4
-        with:
-          name: dist-${{ github.sha }}
-      - name: Run unit tests with coverage
-        run: npx vitest run test/unit --coverage --reporter=verbose
-      - name: Upload coverage
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: unit-coverage-${{ github.sha }}
-          path: coverage/
-          retention-days: 14
+      - name: Run unit tests
+        run: npx vitest run test/unit --reporter=verbose
 
   # ── Stage 3: Contract Tests (HTTP/WS shape contracts, no VPS) ────────────────
   contract:
@@ -99,10 +88,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
       - run: npm ci
-      - name: Download build
-        uses: actions/download-artifact@v4
-        with:
-          name: dist-${{ github.sha }}
+      - run: npm run build
       - name: Run integration tests
         # --retry 1: allows a single retry per test to catch transient flakes
         # (process startup timing, port allocation). Consistent failures are real.
@@ -121,10 +107,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
       - run: npm ci
-      - name: Download build
-        uses: actions/download-artifact@v4
-        with:
-          name: dist-${{ github.sha }}
+      - run: npm run build
       - name: Run local E2E tests
         # Covers local-commands (binary smoke), error-matrix (config/arg validation),
         # and concurrent (SQLite WAL mode) — all no-VPS, no-SSH required.
@@ -156,10 +139,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
       - run: npm ci
-      - name: Download build
-        uses: actions/download-artifact@v4
-        with:
-          name: dist-${{ github.sha }}
+      - run: npm run build
       - name: Configure SSH key
         run: |
           mkdir -p ~/.ssh
@@ -206,10 +186,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
       - run: npm ci
-      - name: Download build
-        uses: actions/download-artifact@v4
-        with:
-          name: dist-${{ github.sha }}
+      - run: npm run build
       - name: Run full suite with coverage enforcement
         run: npm run test:coverage -- --testTimeout 30000 --reporter=dot
       - name: Upload merged coverage report
