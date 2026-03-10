@@ -178,7 +178,7 @@ jobs:
     name: Coverage Gate
     runs-on: ubuntu-latest
     needs: [unit, contract, integration, e2e-local]
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -187,6 +187,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
       - name: Run full suite with coverage enforcement
         run: npm run test:coverage -- --testTimeout 30000 --reporter=dot
       - name: Upload merged coverage report
