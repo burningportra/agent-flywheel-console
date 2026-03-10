@@ -1,12 +1,14 @@
 /**
- * test/e2e/remote/03-rollback-deploy.e2e.ts — bead: 3qw.5.4
+ * test/e2e/lifecycle/02-rollback-verification.e2e.ts — bead: agent-9wjq.2
  *
- * Remote E2E coverage for rollback safety and deploy confirmation/push flows.
+ * Focused rollback verification against a prepared VPS repo:
+ *   - cancellation on wrong confirmation leaves HEAD unchanged
+ *   - confirmed rollback restores the stored checkpoint SHA
+ *   - tracked changes added after the checkpoint disappear
+ *   - rollback event payload records the expected checkpoint SHA
  *
- * Commands such as `flywheel deploy` infer the project name from cwd. These
- * specs therefore run the real CLI from a temp directory whose basename
- * matches the remote project under test, while still executing the built CLI
- * binary from the source checkout.
+ * Requires FLYWHEEL_TEST_E2E=1 and ~/.flywheel/ssh.yaml.
+ * The destructive reset test additionally requires FLYWHEEL_TEST_DESTRUCTIVE=1.
  */
 
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -30,6 +32,7 @@ import {
 
 const runVpsE2e = process.env.FLYWHEEL_TEST_E2E === "1" && hasSshConfig();
 const runDestructive = runVpsE2e && process.env.FLYWHEEL_TEST_DESTRUCTIVE === "1";
+const describeVps = runVpsE2e ? describe : describe.skip;
 const describeDestructive = runDestructive ? describe : describe.skip;
 
 interface TestWorkspace {
@@ -40,7 +43,7 @@ interface TestWorkspace {
 }
 
 let workspace: TestWorkspace | null = null;
-const testProject = getTestProject();
+const testProject = `${getTestProject()}-rollback`;
 
 beforeEach(() => {
   workspace = createWorkspace(testProject);
@@ -95,6 +98,12 @@ function seedRollbackRun(projectName: string, checkpointSha: string): string {
   return runId;
 }
 
+function rollbackEventsFor(runId: string) {
+  const db = initDb(currentWorkspace().stateDbPath);
+  const state = new StateManager(db);
+  return state.getEvents(runId).filter((event) => event.event_type === "rollback");
+}
+
 async function sshExec(
   command: string,
   options: { timeoutMs?: number } = {}
@@ -113,7 +122,6 @@ async function sshExec(
 
 async function prepareRemoteRepo(projectName: string): Promise<{
   projectPath: string;
-  originPath: string;
   initialSha: string;
 }> {
   const initResult = await runFlywheelWithDiagnostics(["init", projectName], {
@@ -123,24 +131,17 @@ async function prepareRemoteRepo(projectName: string): Promise<{
     remoteProjectName: projectName,
     timeout: 60_000,
   });
-  assertSuccess(initResult, "flywheel init for rollback/deploy E2E");
+  assertSuccess(initResult, "flywheel init for rollback verification E2E");
 
   const config = loadSSHConfig();
   const projectPath = `${config.remoteRepoRoot}/${projectName}`;
-  const originPath = `${config.remoteRepoRoot}/.flywheel-e2e-origins/${projectName}.git`;
 
   const bootstrap = await sshExec(
     [
-      `mkdir -p ${shellQuote(`${config.remoteRepoRoot}/.flywheel-e2e-origins`)}`,
-      `if test ! -d ${shellQuote(originPath)}; then git init --bare ${shellQuote(originPath)}; fi`,
       `cd ${shellQuote(projectPath)}`,
       `git config user.email ${shellQuote("flywheel-e2e@example.invalid")}`,
       `git config user.name ${shellQuote("Flywheel E2E")}`,
       `if ! git rev-parse HEAD >/dev/null 2>&1; then printf 'seed\\n' > README.md && git add README.md && git commit -m ${shellQuote("seed remote repo")}; fi`,
-      `git remote remove origin >/dev/null 2>&1 || true`,
-      `git remote add origin ${shellQuote(originPath)}`,
-      `git branch -M main`,
-      `git push -u origin main --force`,
       `git rev-parse HEAD`,
     ].join(" && "),
     { timeoutMs: 60_000 }
@@ -152,79 +153,66 @@ async function prepareRemoteRepo(projectName: string): Promise<{
 
   return {
     projectPath,
-    originPath,
     initialSha: bootstrap.stdout.trim().split(/\s+/).pop() ?? "",
   };
 }
 
-async function appendTrackedChange(projectPath: string, marker: string): Promise<void> {
-  const result = await sshExec(
-    `cd ${shellQuote(projectPath)} && printf '\\n${marker}\\n' >> README.md`,
-    { timeoutMs: 15_000 }
-  );
-
-  if (result.code !== 0) {
-    throw new Error(`Failed to create tracked change:\n${result.stderr || result.stdout}`);
-  }
-}
-
-async function commitRemoteChange(projectPath: string, message: string): Promise<string> {
+async function appendTrackedFile(projectPath: string, fileName: string, content: string): Promise<void> {
   const result = await sshExec(
     [
       `cd ${shellQuote(projectPath)}`,
-      `printf '\\n${message}\\n' >> README.md`,
-      `git add README.md`,
-      `git commit -m ${shellQuote(message)}`,
-      `git rev-parse HEAD`,
+      `printf ${shellQuote(content)} > ${shellQuote(fileName)}`,
+      `git add ${shellQuote(fileName)}`,
+      `git commit -m ${shellQuote(`add ${fileName}`)}`,
     ].join(" && "),
     { timeoutMs: 30_000 }
   );
 
   if (result.code !== 0) {
-    throw new Error(`Failed to create remote commit:\n${result.stderr || result.stdout}`);
+    throw new Error(`Failed to create tracked file commit:\n${result.stderr || result.stdout}`);
   }
-
-  return result.stdout.trim().split(/\s+/).pop() ?? "";
 }
 
 async function readRemoteHead(projectPath: string): Promise<string> {
-  const result = await sshExec(
-    `cd ${shellQuote(projectPath)} && git rev-parse HEAD`,
-    { timeoutMs: 15_000 }
-  );
+  const result = await sshExec(`cd ${shellQuote(projectPath)} && git rev-parse HEAD`, {
+    timeoutMs: 15_000,
+  });
   if (result.code !== 0) {
     throw new Error(`Failed to read remote HEAD:\n${result.stderr || result.stdout}`);
   }
   return result.stdout.trim();
 }
 
-async function readOriginHead(originPath: string): Promise<string> {
+async function remotePathExists(projectPath: string, fileName: string): Promise<boolean> {
   const result = await sshExec(
-    `git --git-dir=${shellQuote(originPath)} rev-parse HEAD`,
+    `cd ${shellQuote(projectPath)} && test -e ${shellQuote(fileName)} && echo yes || echo no`,
     { timeoutMs: 15_000 }
   );
   if (result.code !== 0) {
-    throw new Error(`Failed to read origin HEAD:\n${result.stderr || result.stdout}`);
+    throw new Error(`Failed to probe remote file existence:\n${result.stderr || result.stdout}`);
   }
-  return result.stdout.trim();
+  return result.stdout.trim() === "yes";
 }
 
-describe("rollback/deploy local safety contracts", () => {
-  it("derives the deploy confirmation target from the temp project cwd", () => {
-    const result = runFlywheel(["deploy"], {
+describe("flywheel rollback local safety checks", () => {
+  it("cancels on the wrong confirmation string before any SSH work", () => {
+    const runId = seedRollbackRun(testProject, "deadbeef1234567890abcdef");
+
+    const result = runFlywheel(["rollback", runId.slice(0, 8)], {
       cwd: currentWorkspace().cwd,
       env: currentWorkspace().env,
-      stdin: "DEPLOY wrong-project\n",
+      stdin: "NOT IT\n",
       timeout: 15_000,
     });
 
-    assertFailure(result, "deploy confirmation should fail with the wrong project name");
-    expect(result.stdout + result.stderr).toContain(`DEPLOY ${testProject}`);
-    expect(result.stdout + result.stderr).not.toContain("DEPLOY agent-flywheel-console");
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout + result.stderr).toMatch(/cancelled/i);
+    expect(rollbackEventsFor(runId)).toHaveLength(0);
   });
 
-  it("rejects rollback before SSH when the stored checkpoint SHA is invalid", () => {
+  it("rejects an invalid stored checkpoint SHA with a clean user-facing error", () => {
     const runId = seedRollbackRun(testProject, "definitely-not-a-sha!");
+
     const result = runFlywheel(["rollback", runId.slice(0, 8)], {
       cwd: currentWorkspace().cwd,
       env: currentWorkspace().env,
@@ -240,20 +228,72 @@ describe("rollback/deploy local safety contracts", () => {
     expect(result.stdout + result.stderr).not.toContain("Unexpected error");
     expect(result.stdout + result.stderr).not.toContain("at assertSafeSha");
     expect(result.stdout + result.stderr).not.toContain("Node.js v");
+    expect(rollbackEventsFor(runId)).toHaveLength(0);
+  });
+
+  it("fails before prompting or connecting when the stored run has no project name", () => {
+    const runId = seedRollbackRun("   ", "deadbeef1234567890abcdef");
+
+    const result = runFlywheel(["rollback", runId.slice(0, 8)], {
+      cwd: currentWorkspace().cwd,
+      env: currentWorkspace().env,
+      stdin: "ROLLBACK\n",
+      timeout: 15_000,
+    });
+
+    assertFailure(result, "rollback should reject a run with no project name");
+    expect(result.stdout + result.stderr).toMatch(/missing project_name/i);
+    expect(result.stdout + result.stderr).not.toContain("DESTRUCTIVE OPERATION");
+    expect(result.stdout + result.stderr).not.toContain('Type "ROLLBACK"');
+    expect(result.stdout + result.stderr).not.toMatch(/SSH error/i);
+    expect(result.stdout + result.stderr).not.toContain("Unexpected error");
+    expect(rollbackEventsFor(runId)).toHaveLength(0);
   });
 });
 
-describeDestructive("rollback/deploy against a prepared VPS repo", () => {
-  it("resets the remote repo back to the stored checkpoint SHA", async () => {
+describeVps("flywheel rollback confirmation safety", () => {
+  it("cancels on the wrong confirmation string and keeps the remote HEAD unchanged", async () => {
     const remote = await prepareRemoteRepo(testProject);
     const checkpointSha = remote.initialSha;
-    const postCheckpointSha = await commitRemoteChange(
-      remote.projectPath,
-      `rollback-target-${Date.now()}`
-    );
     const runId = seedRollbackRun(testProject, checkpointSha);
 
-    expect(postCheckpointSha).not.toBe(checkpointSha);
+    await appendTrackedFile(
+      remote.projectPath,
+      "rollback-cancel-marker.txt",
+      `cancel marker ${Date.now()}\n`
+    );
+    const headBeforeRollback = await readRemoteHead(remote.projectPath);
+
+    const result = runFlywheel(["rollback", runId.slice(0, 8)], {
+      cwd: currentWorkspace().cwd,
+      env: currentWorkspace().env,
+      stdin: "NOT IT\n",
+      timeout: 20_000,
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout + result.stderr).toMatch(/cancelled/i);
+    expect(await readRemoteHead(remote.projectPath)).toBe(headBeforeRollback);
+    expect(rollbackEventsFor(runId)).toHaveLength(0);
+  });
+});
+
+describeDestructive("flywheel rollback lifecycle verification", () => {
+  it("resets the repo to the stored checkpoint, removes the tracked marker file, and logs the rollback SHA", async () => {
+    const remote = await prepareRemoteRepo(testProject);
+    const checkpointSha = remote.initialSha;
+    const runId = seedRollbackRun(testProject, checkpointSha);
+    const markerFile = "rollback-marker.txt";
+
+    await appendTrackedFile(
+      remote.projectPath,
+      markerFile,
+      `marker created after checkpoint ${Date.now()}\n`
+    );
+
+    const headBeforeRollback = await readRemoteHead(remote.projectPath);
+    expect(headBeforeRollback).not.toBe(checkpointSha);
+    expect(await remotePathExists(remote.projectPath, markerFile)).toBe(true);
 
     const result = await runFlywheelWithDiagnostics(["rollback", runId.slice(0, 8)], {
       cwd: currentWorkspace().cwd,
@@ -264,51 +304,23 @@ describeDestructive("rollback/deploy against a prepared VPS repo", () => {
       remoteProjectName: testProject,
     });
 
-    assertSuccess(result, "rollback should succeed against the prepared remote repo");
+    assertSuccess(result, "flywheel rollback lifecycle verification");
     expect(result.stdout + result.stderr).toContain(checkpointSha.slice(0, 12));
     expect(await readRemoteHead(remote.projectPath)).toBe(checkpointSha);
+    expect(await remotePathExists(remote.projectPath, markerFile)).toBe(false);
 
     const db = initDb(currentWorkspace().stateDbPath);
     const state = new StateManager(db);
-    const rollbackEvents = state
+    const rollbackEvent = state
       .getEvents(runId)
-      .filter((event) => event.event_type === "rollback");
-    expect(rollbackEvents.length).toBeGreaterThan(0);
-  });
+      .filter((event) => event.event_type === "rollback")
+      .at(-1);
 
-  it("commits tracked changes and pushes them to the prepared origin remote", async () => {
-    const remote = await prepareRemoteRepo(testProject);
-    const beforeSha = await readRemoteHead(remote.projectPath);
-    await appendTrackedChange(remote.projectPath, `deploy-change-${Date.now()}`);
+    expect(rollbackEvent).toBeTruthy();
+    expect(rollbackEvent?.actor).toBe("human");
+    expect(rollbackEvent?.payload_json).toBeTruthy();
 
-    const result = await runFlywheelWithDiagnostics(["deploy"], {
-      cwd: currentWorkspace().cwd,
-      env: currentWorkspace().env,
-      stdin: `DEPLOY ${testProject}\n`,
-      timeout: 90_000,
-      remoteDiagnostics: true,
-      remoteProjectName: testProject,
-    });
-
-    assertSuccess(result, "deploy should commit tracked changes and push");
-    expect(result.stdout).toMatch(/[0-9a-f]{12}.*→.*[0-9a-f]{12}/i);
-
-    const afterSha = await readRemoteHead(remote.projectPath);
-    expect(afterSha).not.toBe(beforeSha);
-    expect(await readOriginHead(remote.originPath)).toBe(afterSha);
-
-    const db = initDb(currentWorkspace().stateDbPath);
-    const state = new StateManager(db);
-    const deployRun = state
-      .listFlywheelRuns()
-      .find((run) => run.project_name === testProject && run.phase === "deploy");
-    expect(deployRun).toBeTruthy();
-
-    const deployEvents = state
-      .getEvents(deployRun!.id)
-      .filter((event) => /deploy_/.test(event.event_type))
-      .map((event) => event.event_type);
-    expect(deployEvents).toContain("deploy_started");
-    expect(deployEvents).toContain("deploy_completed");
+    const payload = JSON.parse(rollbackEvent?.payload_json ?? "{}") as { checkpoint_sha?: string };
+    expect(payload.checkpoint_sha).toBe(checkpointSha);
   });
 });

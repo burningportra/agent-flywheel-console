@@ -69,16 +69,34 @@ function requireRollbackRun(state: StateManager, runId?: string): FlywheelRun & 
   return run as FlywheelRun & { checkpoint_sha: string };
 }
 
+function requireRollbackProjectName(run: FlywheelRun): string {
+  const projectName = (run.project_name ?? "").trim();
+  if (!projectName) {
+    console.error(
+      chalk.red(`\n✗ Run ${run.id} is missing project_name; cannot resolve remote repo path.`)
+    );
+    process.exit(1);
+  }
+  return projectName;
+}
+
 export async function runRollback(opts: RollbackOptions = {}): Promise<void> {
   const db = initDb();
   const state = new StateManager(db);
 
   const run = requireRollbackRun(state, opts.runId);
+  const projectName = requireRollbackProjectName(run);
+  try {
+    assertSafeSha(run.checkpoint_sha);
+  } catch (err) {
+    console.error(chalk.red(`\n✗ ${err instanceof Error ? err.message : String(err)}`));
+    process.exit(1);
+  }
 
   console.log(chalk.bgRed.white.bold("\n  ⚠  DESTRUCTIVE OPERATION — VPS Repository Rollback  "));
   console.log();
   console.log(`   Run:        ${chalk.dim(run.id.slice(0, 8))}…`);
-  console.log(`   Project:    ${chalk.bold(run.project_name ?? "—")}`);
+  console.log(`   Project:    ${chalk.bold(projectName)}`);
   console.log(`   Checkpoint: ${chalk.yellow(run.checkpoint_sha.slice(0, 12))}…`);
   console.log();
   console.log(chalk.red("   git reset --hard will run on the VPS repo."));
@@ -100,43 +118,31 @@ export async function runRollback(opts: RollbackOptions = {}): Promise<void> {
   let exitCode = 0;
 
   try {
-    // Validate the stored checkpoint before any SSH or shell usage so the
-    // operator gets a clean user-facing error instead of an uncaught stack trace.
-    assertSafeSha(run.checkpoint_sha);
-
     const config = await ssh.connect();
-    const projectName = (run.project_name ?? "").trim();
-    if (!projectName) {
-      console.error(
-        chalk.red(`\n✗ Run ${run.id} is missing project_name; cannot resolve remote repo path.`)
-      );
+    const repoPath = `${trimTrailingSlash(config.remoteRepoRoot)}/${projectName}`;
+
+    console.log(chalk.gray(`\nConnected to ${config.user}@${config.host}.`));
+    console.log(
+      chalk.gray(`Running: git -C ${repoPath} reset --hard ${run.checkpoint_sha}`)
+    );
+
+    const result = await ssh.exec(
+      `git -C ${shellQuote(repoPath)} reset --hard ${run.checkpoint_sha}`,
+      { timeoutMs: 30_000 }
+    );
+
+    if (result.code !== 0) {
+      console.error(chalk.red(`\n✗ git reset failed (exit ${result.code}):`));
+      console.error(result.stderr.trim() || result.stdout.trim());
       exitCode = 1;
     } else {
-      const repoPath = `${trimTrailingSlash(config.remoteRepoRoot)}/${projectName}`;
+      console.log(chalk.green("\n✓ Rollback complete."));
+      console.log(result.stdout.trim());
 
-      console.log(chalk.gray(`\nConnected to ${config.user}@${config.host}.`));
-      console.log(
-        chalk.gray(`Running: git -C ${repoPath} reset --hard ${run.checkpoint_sha}`)
-      );
-
-      const result = await ssh.exec(
-        `git -C ${shellQuote(repoPath)} reset --hard ${run.checkpoint_sha}`,
-        { timeoutMs: 30_000 }
-      );
-
-      if (result.code !== 0) {
-        console.error(chalk.red(`\n✗ git reset failed (exit ${result.code}):`));
-        console.error(result.stderr.trim() || result.stdout.trim());
-        exitCode = 1;
-      } else {
-        console.log(chalk.green("\n✓ Rollback complete."));
-        console.log(result.stdout.trim());
-
-        // Log the rollback event
-        state.logEvent(run.id, "rollback", {
-          checkpoint_sha: run.checkpoint_sha,
-        }, { actor: "human" });
-      }
+      // Log the rollback event
+      state.logEvent(run.id, "rollback", {
+        checkpoint_sha: run.checkpoint_sha,
+      }, { actor: "human" });
     }
   } catch (err) {
     if (err instanceof SSHError) {
