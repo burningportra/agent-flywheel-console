@@ -93,7 +93,7 @@ export class SwarmCoordinator {
     // meaningful when an existing runId is passed (resume scenario).
     const runId = options.runId ?? this.state.createFlywheelRun(projectName, "swarm");
 
-    // Budget check: meaningful for resumed runs; always passes for brand-new ones.
+    // Fresh runs still use the shared guard, but always start at $0 spend.
     if (!options.runId) {
       this.assertBudget(runId, options.budgetUsd);
     }

@@ -65,9 +65,13 @@ for (const file of jsonFiles) {
       entry.runs.push(runLabel);
       if (assertion.status === "passed") {
         entry.passed++;
-      } else {
+      } else if (assertion.status === "failed") {
+        // Only count genuine failures. "pending"/"todo"/"skipped" tests are
+        // not flaky — they're intentionally skipped and should not pollute
+        // the "always failing" or "flaky" buckets.
         entry.failed++;
       }
+      // else: "pending", "todo", "skipped" — ignored intentionally
       testResults.set(key, entry);
     }
   }
@@ -87,11 +91,14 @@ for (const [name, stats] of testResults.entries()) {
       totalRuns: stats.runs.length,
       flakyRate: `${((stats.failed / stats.runs.length) * 100).toFixed(0)}%`,
     });
-  } else if (stats.passed === 0) {
+  } else if (stats.failed > 0 && stats.passed === 0) {
+    // Only report as "always failing" if there were genuine failures.
+    // Tests that were always skipped (passed=0, failed=0) are excluded.
     alwaysFailing.push({ test: name, failCount: stats.failed });
-  } else {
+  } else if (stats.passed > 0) {
     alwaysPassing.push(name);
   }
+  // else: test only appeared as skipped across all runs — not counted anywhere
 }
 
 // Sort by flaky rate descending

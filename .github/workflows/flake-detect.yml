@@ -14,10 +14,10 @@ on:
     - cron: "0 2 * * *"
   workflow_dispatch:
     inputs:
-      runs:
-        description: "Number of detection runs (default: 5)"
+      note:
+        description: "Optional note for this manual run (recorded in workflow title)"
         required: false
-        default: "5"
+        default: ""
 
 concurrency:
   group: flake-detect
@@ -26,7 +26,10 @@ concurrency:
 env:
   NODE_VERSION: "20"
   NO_COLOR: "1"
-  DETECTION_RUNS: ${{ github.event.inputs.runs || '5' }}
+  # DETECTION_RUNS input is informational only — the matrix is hardcoded to 5
+  # runs. GitHub Actions does not support dynamic matrix sizes without a
+  # separate job, which adds unnecessary complexity. Change the matrix array
+  # directly if you need a different run count.
 
 jobs:
   flake-detect:
@@ -53,23 +56,28 @@ jobs:
         id: integration
         continue-on-error: true
         run: |
+          mkdir -p reports
           npx vitest run test/integration \
             --testTimeout 30000 \
             --retry 0 \
             --reporter=verbose \
             --reporter=json \
-            --outputFile=reports/integration-run-${{ matrix.run }}.json
+            --outputFile.json=reports/integration-run-${{ matrix.run }}.json
 
       - name: Run local E2E suite (no retry)
         id: e2e
         continue-on-error: true
         run: |
-          npx vitest run test/e2e/local-commands.e2e.ts \
+          mkdir -p reports
+          npx vitest run \
+            test/e2e/local-commands.e2e.ts \
+            test/e2e/error-matrix \
+            test/e2e/concurrent \
             --testTimeout 30000 \
             --retry 0 \
             --reporter=verbose \
             --reporter=json \
-            --outputFile=reports/e2e-run-${{ matrix.run }}.json
+            --outputFile.json=reports/e2e-run-${{ matrix.run }}.json
 
       - name: Upload run results
         if: always()

@@ -67,8 +67,8 @@ afterEach(() => dir.cleanup());
 
 // ── Concurrent reads ──────────────────────────────────────────────────────────
 
-describe("Concurrent reads — WAL mode allows parallel SELECT", () => {
-  it("two concurrent flywheel runs processes both exit 0 with no lock errors", () => {
+describe("Multi-process reads — WAL mode allows parallel SELECT", () => {
+  it("two sequential-process flywheel runs calls both exit 0 with no lock errors", () => {
     // Seed a run so there's actual data to read
     const db = initDb(join(dir.path, "concurrent-test", "state.db"));
     const sm = new StateManager(db);
@@ -76,9 +76,10 @@ describe("Concurrent reads — WAL mode allows parallel SELECT", () => {
     sm.completeFlywheelRun(runId, 0.001, "seed");
     db.close();
 
-    // Launch two read processes. spawnSync is sequential in Node, but since
-    // both complete quickly, they will interleave at the OS level during
-    // SQLite's WAL read-lock acquisition.
+    // spawnSync runs these sequentially (it blocks until each child exits),
+    // so this is not true concurrency. The value is verifying that separate
+    // processes can each open and read the WAL-mode DB without errors — a
+    // prerequisite for real concurrent access working correctly.
     const [a, b] = [
       fly(["runs"], dbEnv, "proc-A: runs"),
       fly(["runs"], dbEnv, "proc-B: runs"),
@@ -90,7 +91,7 @@ describe("Concurrent reads — WAL mode allows parallel SELECT", () => {
     assertNoLockError(b);
   });
 
-  it("5 concurrent flywheel runs all exit 0 — no reader blocks reader", () => {
+  it("5 repeated-process flywheel runs all exit 0 — no reader blocks reader", () => {
     const db = initDb(join(dir.path, "concurrent-test", "state.db"));
     const sm = new StateManager(db);
     for (let i = 0; i < 3; i++) {
@@ -98,9 +99,8 @@ describe("Concurrent reads — WAL mode allows parallel SELECT", () => {
     }
     db.close();
 
-    // Run 5 sequentially (Node is single-threaded for spawnSync) but verify
-    // each one has no lock errors — WAL mode ensures these won't block in
-    // a real concurrent scenario.
+    // 5 sequential subprocesses — verifies that repeated process-boundary
+    // reads on a WAL-mode DB each get consistent results without errors.
     const results = [0, 1, 2, 3, 4].map((i) => fly(["runs"], dbEnv, `proc-${i}: runs`));
 
     for (const r of results) {

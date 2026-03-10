@@ -126,7 +126,14 @@ jobs:
         with:
           name: dist-${{ github.sha }}
       - name: Run local E2E tests
-        run: npx vitest run test/e2e/local-commands.e2e.ts --testTimeout 30000 --retry 1 --reporter=verbose
+        # Covers local-commands (binary smoke), error-matrix (config/arg validation),
+        # and concurrent (SQLite WAL mode) — all no-VPS, no-SSH required.
+        run: |
+          npx vitest run \
+            test/e2e/local-commands.e2e.ts \
+            test/e2e/error-matrix \
+            test/e2e/concurrent \
+            --testTimeout 30000 --retry 1 --reporter=verbose
 
   # ── Stage 6: VPS E2E Tests (opt-in, requires SSH secret) ────────────────────
   #
