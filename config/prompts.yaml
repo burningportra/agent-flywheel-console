@@ -1,0 +1,133 @@
+prompts:
+  # Phase 1: Plan
+  generate-ideas:
+    text: |
+      OK so now I want you to come up with your top 10 most brilliant ideas for
+      enhancing this project. Think of 100 ideas, then filter down to the 10 most
+      impactful, creative, and feasible ones. Be bold.
+    model: opus
+    effort: max
+    phase: plan
+
+  plan-adversarial-challenge:
+    text: |
+      You are a skeptical senior engineer reviewing this plan before any code is
+      written. Identify: missing requirements, architectural decisions that will be hard
+      to reverse, scope that will expand unexpectedly, and assumptions unlikely to hold.
+      Output 3–7 named risks with brief explanations. Be direct. Do not suggest
+      improvements — only surface problems.
+    model: opus
+    effort: max
+    phase: plan
+
+  # Phase 2: Beads
+  beads-generate-from-plan:
+    text: |
+      Read the plan at {plan_path} super carefully in full. Then create a comprehensive
+      and granular set of beads for all of it with tasks, subtasks, and dependency
+      structure overlaid, with detailed comments so the whole thing is totally
+      self-contained and self-documenting. Use the `br` tool repeatedly to create
+      the actual beads. Use /effort max.
+    model: opus
+    effort: max
+    phase: beads
+
+  beads-review-refine:
+    text: |
+      Check over each bead super carefully — are you sure it makes sense? Is it
+      optimal? Could we change anything to make the system work better? If so,
+      revise the beads. It's a lot easier and faster to operate in plan space
+      before we start implementing. Use /effort max.
+    model: opus
+    effort: max
+    phase: beads
+
+  # Phase 3: Swarm
+  commit-work:
+    text: |
+      Now, based on your knowledge of the project, commit all changed files with a
+      descriptive commit message. Only git add tracked files. Do not rebase, merge,
+      or reset --hard. Do not touch untracked files. Push after committing.
+    model: any
+    effort: high
+    phase: swarm
+
+  agent-unstuck:
+    text: |
+      Take stock of where you are. If you're blocked on this bead, leave a note in
+      agent mail explaining why, un-claim the bead, and pick up the next available one
+      from br ready. Don't stay stuck.
+    model: any
+    effort: low
+    phase: swarm
+
+  # Phase 4: Review
+  fresh-review:
+    text: |
+      Great, now I want you to carefully read over all of the new code that's been
+      written. Review it with fresh eyes — look for bugs, logic errors, missing edge
+      cases, and anything that doesn't match the plan. Be thorough.
+    model: any
+    effort: high
+    phase: review
+
+  peer-review:
+    text: |
+      Ok can you now turn your attention to reviewing the code written by your fellow
+      agents. Look for inconsistencies between modules, duplicated logic, conflicting
+      patterns, and integration issues. Use /effort max.
+    model: opus
+    effort: max
+    phase: review
+
+  ui-ux-scrutiny:
+    text: |
+      Review all UI components and user-facing code. Check for: accessibility issues,
+      inconsistent spacing/typography, missing loading states, error states, empty
+      states, and responsive breakpoints. Stripe-level quality bar.
+    model: opus
+    effort: max
+    phase: review
+
+  ubs-scan:
+    text: |
+      Run UBS scan on the entire codebase. Fix every legitimate finding. Ignore false
+      positives but document why you're ignoring them.
+    model: any
+    effort: high
+    phase: review
+
+  test-coverage:
+    text: |
+      Audit unit and e2e test coverage. Identify gaps. Create test beads for any
+      critical untested paths. Focus on: business logic, error handling, and
+      integration boundaries.
+    model: any
+    effort: high
+    phase: review
+
+  orm-audit:
+    text: |
+      Review all database schema, models, and queries. Check for: N+1 queries,
+      missing indices, logical errors in relationships, migration safety, and
+      data integrity constraints.
+    model: opus
+    effort: max
+    phase: review
+
+  tanstack-optimize:
+    text: |
+      Identify opportunities to use TanStack libraries (Query, Table, Router, Form)
+      where custom implementations exist. Only suggest replacements that genuinely
+      simplify the code.
+    model: any
+    effort: high
+    phase: review
+
+  dcg-safety:
+    text: |
+      Verify DCG hook is properly configured. Test destructive commands in a safe
+      context. Ensure all dangerous operations require explicit confirmation.
+    model: any
+    effort: high
+    phase: review

@@ -1,0 +1,40 @@
+# Copy to providers.yaml (chmod 600) and fill in your keys
+# providers.yaml is gitignored — never commit API keys
+slots:
+  plan:
+    - model: claude-opus-4-20250514
+      key: "sk-ant-..."
+    - model: gpt-4o
+      key: "sk-..."
+    - model: gemini-1.5-pro
+      key: "AIza..."
+  synthesis:
+    - model: claude-opus-4-20250514
+      key: "sk-ant-..."
+  swarm:
+    - model: claude-sonnet-4-20250514
+      key: "sk-ant-account-1"
+      max_concurrent: 3
+    - model: claude-sonnet-4-20250514
+      key: "sk-ant-account-2"
+      max_concurrent: 3
+  commit_slot:
+    - model: claude-sonnet-4-20250514
+      key: "sk-ant-account-1"
+      max_concurrent: 1
+
+rotation: round-robin
+
+pricing:
+  claude-opus-4-20250514:
+    input_per_mtok: 15.00
+    output_per_mtok: 75.00
+  claude-sonnet-4-20250514:
+    input_per_mtok: 3.00
+    output_per_mtok: 15.00
+  gpt-4o:
+    input_per_mtok: 2.50
+    output_per_mtok: 10.00
+  gemini-1.5-pro:
+    input_per_mtok: 3.50
+    output_per_mtok: 10.50

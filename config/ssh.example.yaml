@@ -1,0 +1,7 @@
+# Copy to ssh.yaml and fill in your values
+# ssh.yaml is gitignored — never commit credentials
+host: "your-vps.example.com"
+user: ubuntu
+port: 22
+key_path: "~/.ssh/id_ed25519"
+remote_repo_root: "/home/ubuntu/projects"

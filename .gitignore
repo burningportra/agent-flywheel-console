@@ -1,0 +1,23 @@
+node_modules/
+dist/
+*.db
+*.db-journal
+
+# Config files with secrets
+config/providers.yaml
+config/ssh.yaml
+
+# Dashboard build output
+dashboard/dist/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+wizard-log.jsonl
