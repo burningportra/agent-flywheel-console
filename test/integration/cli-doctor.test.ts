@@ -8,9 +8,11 @@ import { spawnSync } from "node:child_process";
 import { join, resolve } from "node:path";
 import { mkdirSync, writeFileSync } from "node:fs";
 import yaml from "js-yaml";
+import { loadPrompts } from "../../cli/prompts.js";
 import { tempDir, FIXTURE_SSH_CONFIG, FIXTURE_PROVIDERS_CONFIG } from "../helpers.js";
 
 const CLI = resolve("dist/cli.js");
+const PROMPT_COUNT = Object.keys(loadPrompts()).length;
 
 function flywheel(args: string[], extraEnv: Record<string, string> = {}): { exitCode: number; stdout: string; stderr: string } {
   const result = spawnSync("node", [CLI, ...args], {
@@ -52,7 +54,7 @@ describe("flywheel doctor — no config files", () => {
   it("shows prompts.yaml check as OK (bundled config found)", () => {
     const { stdout } = flywheel(["doctor"], env());
     expect(stdout).toContain("prompts.yaml");
-    expect(stdout).toMatch(/✓.*14|14.*✓|14 prompts/i);
+    expect(stdout).toContain(`${PROMPT_COUNT} prompts loaded`);
   });
 
   it("shows SQLite check as OK with fresh DB", () => {

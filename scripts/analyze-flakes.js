@@ -14,7 +14,7 @@
  * Exits 0 always — the calling workflow decides whether to fail based on count.
  */
 
-import { readFileSync, readdirSync, writeFileSync, statSync } from "node:fs";
+import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join, basename } from "node:path";
 
 const resultsDir = process.argv[2];
@@ -26,11 +26,11 @@ if (!resultsDir) {
 /** @param {string} dir */
 function findJsonFiles(dir) {
   const files = [];
-  for (const entry of readdirSync(dir)) {
-    const full = join(dir, entry);
-    if (statSync(full).isDirectory()) {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) {
       files.push(...findJsonFiles(full));
-    } else if (entry.endsWith(".json")) {
+    } else if (entry.isFile() && entry.name.endsWith(".json")) {
       files.push(full);
     }
   }
@@ -56,11 +56,24 @@ for (const file of jsonFiles) {
   const runLabel = basename(file, ".json");
 
   // vitest JSON output structure:
-  // { testResults: [{ testFilePath, assertionResults: [{ fullName, status }] }] }
+  // { testResults: [{ name, assertionResults: [{ fullName, status }] }] }
   const testFiles = raw.testResults ?? [];
   for (const testFile of testFiles) {
+    const fileLabel =
+      typeof testFile.name === "string"
+        ? testFile.name
+        : typeof testFile.testFilePath === "string"
+          ? testFile.testFilePath
+          : runLabel;
+
     for (const assertion of testFile.assertionResults ?? []) {
-      const key = `${testFile.testFilePath} > ${assertion.fullName}`;
+      const testName =
+        typeof assertion.fullName === "string" && assertion.fullName.length > 0
+          ? assertion.fullName
+          : typeof assertion.title === "string"
+            ? assertion.title
+            : "(unknown assertion)";
+      const key = `${fileLabel} > ${testName}`;
       const entry = testResults.get(key) ?? { passed: 0, failed: 0, runs: [] };
       entry.runs.push(runLabel);
       if (assertion.status === "passed") {

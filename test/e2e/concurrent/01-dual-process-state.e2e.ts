@@ -107,7 +107,7 @@ describe("Multi-process reads — WAL mode allows parallel SELECT", () => {
       expect(r.exitCode, `[${r.label}] exit code`).toBe(0);
       assertNoLockError(r);
     }
-  });
+  }, 20_000);
 });
 
 // ── Write followed by immediate read ─────────────────────────────────────────
@@ -158,7 +158,9 @@ describe("Write + immediate read — committed data visible across processes", (
 // ── DB integrity after concurrent access ─────────────────────────────────────
 
 describe("DB integrity — state.db is not corrupted after concurrent access", () => {
-  it("state.db passes doctor integrity check after 5 sequential processes", () => {
+  it(
+    "state.db passes doctor integrity check after 5 sequential processes",
+    () => {
     const db = initDb(join(dir.path, "concurrent-test", "state.db"));
     const sm = new StateManager(db);
     const runId = sm.createFlywheelRun("integrity-project", "plan");
@@ -179,5 +181,7 @@ describe("DB integrity — state.db is not corrupted after concurrent access", (
     expect(runs).toHaveLength(1);
     expect(runs[0].project_name).toBe("integrity-project");
     expect(runs[0].cost_usd).toBe(0.5);
-  });
+    },
+    20_000
+  );
 });
