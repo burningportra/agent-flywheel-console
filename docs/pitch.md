@@ -4,7 +4,7 @@
 **Date:** March 2026
 **Appetite:** 6 weeks (solo developer + flywheel swarm against this repo)
 **Status:** Ready to bet
-**Distribution:** Published to npm as `agent-flywheel`
+**Distribution:** Published to npm as `agent-flywheel-console`
 
 ---
 
