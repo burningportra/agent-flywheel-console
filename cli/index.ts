@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { createRequire } from "node:module";
 import { Command } from "commander";
 import chalk from "chalk";
 import { printPromptList, printPrompt, parseVarArgs, sendPrompt } from "./prompts.js";
@@ -21,6 +22,9 @@ import { runInit } from "./init.js";
 import { runMonitor } from "./monitor.js";
 import { runAutopilot } from "./autopilot.js";
 import { getProjectName } from "./utils.js";
+
+const require = createRequire(import.meta.url);
+const { version: packageVersion } = require("../package.json") as { version: string };
 
 /** Parse a positive integer CLI option; exits with error on invalid input. */
 function parsePositiveInt(raw: string, flag: string): number {
@@ -66,7 +70,7 @@ program
   .description(
     "Local control plane for the agentic coding flywheel — orchestrate Plan → Beads → Swarm → Review → Deploy on a remote VPS over SSH."
   )
-  .version("0.1.0");
+  .version(packageVersion);
 
 // Setup + Infra
 program
