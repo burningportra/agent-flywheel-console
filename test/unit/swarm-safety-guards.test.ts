@@ -38,14 +38,10 @@ describe("SwarmCoordinator.start() — count validation", () => {
   });
 });
 
-// ── Budget enforcement (assertBudget) ─────────────────────────────────────────
-// assertBudget is private — test via the public start() API.
-// We seed the state DB with costs and verify the budget check fires before SSH.
-
-// ── Budget logic via state layer (assertBudget is private; test via getTotalCost) ──
-// assertBudget fires AFTER ssh.connect() in start(), so we test the underlying
-// budget comparison logic directly via the state layer.
-// The E2E suite will test the full start() path with a real SSH connection.
+// ── Budget enforcement logic ──────────────────────────────────────────────────
+// assertBudget is private, so this file focuses on the underlying cost math.
+// The transport-level preflight behavior for existing runs is covered by
+// test/integration/budget-enforcement.test.ts.
 
 describe("Budget enforcement logic (via StateManager cost tracking)", () => {
   it("getTotalCost returns 0 for a run with no API calls", () => {
