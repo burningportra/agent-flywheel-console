@@ -258,8 +258,27 @@ export async function startDashboardHarness(
     const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
     const fileName = `${String(screenshotIndex).padStart(2, "0")}-${ts}-${name}.png`;
     const filePath = join(dir, fileName);
-    await page.screenshot({ path: filePath, fullPage: true });
-    return filePath;
+    let lastError: unknown;
+
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        await page.screenshot({
+          path: filePath,
+          fullPage: true,
+          animations: "disabled",
+          caret: "hide",
+        });
+        return filePath;
+      } catch (error) {
+        lastError = error;
+        if (attempt === 2 || page.isClosed()) {
+          break;
+        }
+        await page.waitForTimeout(250);
+      }
+    }
+
+    throw lastError instanceof Error ? lastError : new Error(String(lastError));
   };
 
   // ── Build log saver ─────────────────────────────────────────────────────────
