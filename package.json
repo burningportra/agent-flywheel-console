@@ -1,6 +1,6 @@
 {
   "name": "agent-flywheel-console",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Local control plane for the agentic coding flywheel — CLI + dashboard for orchestrating Plan → Beads → Swarm → Review → Deploy on a remote ACFS VPS over SSH.",
   "type": "module",
   "bin": {

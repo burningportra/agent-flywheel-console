@@ -66,7 +66,7 @@ program
   .description(
     "Local control plane for the agentic coding flywheel — orchestrate Plan → Beads → Swarm → Review → Deploy on a remote VPS over SSH."
   )
-  .version("0.1.1");
+  .version("0.1.2");
 
 // Setup + Infra
 program
