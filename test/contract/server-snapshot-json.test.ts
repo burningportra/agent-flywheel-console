@@ -7,11 +7,13 @@ import { initDb, StateManager } from "../../cli/state.js";
 let server: FlywheelServer;
 let baseUrl: string;
 let wsUrl: string;
+let state: StateManager;
+let runId: string;
 
 beforeEach(async () => {
   const db = initDb(":memory:");
-  const state = new StateManager(db);
-  const runId = state.createFlywheelRun("server-contract-project", "plan");
+  state = new StateManager(db);
+  runId = state.createFlywheelRun("server-contract-project", "plan");
 
   server = createFlywheelServer({
     port: 0,
@@ -30,6 +32,31 @@ beforeEach(async () => {
 afterEach(async () => {
   await server.stop();
 });
+
+async function fetchSnapshot(): Promise<Record<string, unknown>> {
+  const response = await fetch(`${baseUrl}/snapshot`);
+  expect(response.status).toBe(200);
+  return (await response.json()) as Record<string, unknown>;
+}
+
+async function waitForSnapshot(
+  predicate: (body: Record<string, unknown>) => boolean,
+  attempts = 20,
+  delayMs = 25
+): Promise<Record<string, unknown>> {
+  let lastBody: Record<string, unknown> | undefined;
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    lastBody = await fetchSnapshot();
+    if (predicate(lastBody)) {
+      return lastBody;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+  }
+
+  throw new Error(`Snapshot did not reach the expected state: ${JSON.stringify(lastBody)}`);
+}
 
 function assertIsoString(value: unknown): void {
   expect(typeof value).toBe("string");
@@ -124,6 +151,20 @@ describe("FlywheelServer JSON contract", () => {
     expect(payload.nextPhase).toBe("beads");
   });
 
+  it("POST /action rejects illegal gate skips instead of trusting the client payload", async () => {
+    const response = await fetch(`${baseUrl}/action`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ type: "gate.advance", nextPhase: "review" }),
+    });
+
+    expect(response.status).toBe(400);
+    const body = await response.json() as Record<string, unknown>;
+    expect(body.ok).toBe(false);
+    expect(String(body.error)).toContain("Illegal gate transition");
+    expect(state.getFlywheelRun(runId)?.phase).toBe("plan");
+  });
+
   it("POST /action returns {ok:false,error:string} for malformed JSON", async () => {
     const response = await fetch(`${baseUrl}/action`, {
       method: "POST",
@@ -186,5 +227,33 @@ describe("FlywheelServer JSON contract", () => {
     const payload = actionResult?.payload as Record<string, unknown>;
     expect(payload.ok).toBe(true);
     expect(payload.nextPhase).toBe("beads");
+  });
+
+  it("snapshot disables gate.advance once the run reaches the terminal deploy phase", async () => {
+    state.advanceGate(runId, "beads");
+    state.advanceGate(runId, "swarm");
+    state.advanceGate(runId, "review");
+    state.advanceGate(runId, "deploy");
+
+    const body = await waitForSnapshot((snapshot) => {
+      const run = snapshot.run as Record<string, unknown> | undefined;
+      const actionStates = snapshot.actionStates as Record<
+        string,
+        { enabled?: unknown; reason?: unknown }
+      >;
+
+      return (
+        run?.phase === "deploy" &&
+        actionStates["gate.advance"]?.enabled === false
+      );
+    });
+    expect((body.run as Record<string, unknown>).phase).toBe("deploy");
+    const actionStates = body.actionStates as Record<
+      string,
+      { enabled?: unknown; reason?: unknown }
+    >;
+
+    expect(actionStates["gate.advance"]?.enabled).toBe(false);
+    expect(String(actionStates["gate.advance"]?.reason)).toContain("terminal");
   });
 });

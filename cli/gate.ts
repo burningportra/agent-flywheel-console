@@ -3,19 +3,9 @@
 
 import chalk from "chalk";
 import { spawnSync } from "node:child_process";
-import { initDb, StateManager } from "./state.js";
+import { initDb, nextPhaseFor, StateManager } from "./state.js";
 import type { Phase } from "./state.js";
 import { phaseColor } from "./utils.js";
-
-// ── Phase ordering ────────────────────────────────────────────────────────────
-
-const PHASES: Phase[] = ["plan", "beads", "swarm", "review", "deploy"];
-
-function nextPhase(current: Phase): Phase | null {
-  const idx = PHASES.indexOf(current);
-  if (idx === -1 || idx === PHASES.length - 1) return null;
-  return PHASES[idx + 1];
-}
 
 // Use the shared phaseColor for rendering; pre-compute coloured labels for convenience.
 const PHASE_LABEL: Record<Phase, string> = {
@@ -62,7 +52,7 @@ export function gateStatus(): void {
 
   // Most recent run is the "current" one
   const run = runs[0];
-  const next = nextPhase(run.phase as Phase);
+  const next = nextPhaseFor(run.phase as Phase);
 
   const SEP = "─".repeat(48);
   console.log(chalk.bold("\nGate Status"));
@@ -123,7 +113,7 @@ export function gateAdvance(opts: { runId?: string; sha?: string } = {}): void {
     run = found;
   }
 
-  const next = nextPhase(run.phase as Phase);
+  const next = nextPhaseFor(run.phase as Phase);
   if (!next) {
     console.log(chalk.yellow(`Phase "${run.phase}" is the terminal phase — nothing to advance.`));
     process.exit(0);

@@ -4,7 +4,7 @@
  *         advanceGate, completeFlywheelRun, getFlywheelRun, listFlywheelRuns
  */
 import { describe, it, expect, beforeEach } from "vitest";
-import { StateManager } from "../../cli/state.js";
+import { GateTransitionError, StateManager } from "../../cli/state.js";
 import { tempDb } from "../helpers.js";
 
 let sm: StateManager;
@@ -92,6 +92,31 @@ describe("advanceGate", () => {
     expect(gateEvent?.phase_to).toBe("beads");
     expect(gateEvent?.actor).toBe("human");
   });
+
+  it("rejects skipped phases instead of allowing arbitrary jumps", () => {
+    const id = sm.createFlywheelRun("p", "plan");
+
+    expect(() => sm.advanceGate(id, "review")).toThrowError(GateTransitionError);
+    expect(sm.getFlywheelRun(id)?.phase).toBe("plan");
+    expect(sm.getEvents(id)).toHaveLength(0);
+  });
+
+  it("rejects invalid runtime phase strings", () => {
+    const id = sm.createFlywheelRun("p", "plan");
+
+    expect(() => sm.advanceGate(id, "not-a-phase")).toThrowError(GateTransitionError);
+    expect(sm.getFlywheelRun(id)?.phase).toBe("plan");
+  });
+
+  it("preserves an existing checkpoint SHA when a later gate advance omits one", () => {
+    const id = sm.createFlywheelRun("p", "plan");
+
+    sm.advanceGate(id, "beads");
+    sm.advanceGate(id, "swarm", "abc1234567890");
+    sm.advanceGate(id, "review");
+
+    expect(sm.getFlywheelRun(id)?.checkpoint_sha).toBe("abc1234567890");
+  });
 });
 
 describe("completeFlywheelRun", () => {
@@ -131,4 +156,3 @@ describe("getFlywheelRun / listFlywheelRuns", () => {
     expect(phases).toContain("swarm");
   });
 });
-

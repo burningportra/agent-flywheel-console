@@ -9,7 +9,14 @@ import { getPrompt, loadPrompts, substituteVariables } from "./prompts.js";
 import { NtmBridge, type AgentStatus } from "./ntm-bridge.js";
 import { RemoteCommandRunner } from "./remote.js";
 import { SSHManager, loadSSHConfig } from "./ssh.js";
-import { StateManager, initDb, type FlywheelRun, type Phase } from "./state.js";
+import {
+  GateTransitionError,
+  StateManager,
+  initDb,
+  nextPhaseFor,
+  type FlywheelRun,
+  type Phase,
+} from "./state.js";
 import { shellQuote } from "./utils.js";
 
 const DEFAULT_HOST = "127.0.0.1";
@@ -210,9 +217,10 @@ export class FlywheelServer {
     });
 
     this.wsServer.on("connection", (ws) => {
+      const snapshot = this.getLiveSnapshot();
       this.sendJson(ws, {
         type: "snapshot",
-        payload: this.snapshot,
+        payload: snapshot,
       });
 
       ws.on("message", async (message) => {
@@ -264,7 +272,7 @@ export class FlywheelServer {
   }
 
   getSnapshot(): DashboardSnapshot {
-    return this.snapshot;
+    return this.getLiveSnapshot();
   }
 
   private schedulePolling(): void {
@@ -455,8 +463,12 @@ export class FlywheelServer {
         if (!runId) {
           throw new Error("Cannot advance a gate without an active or recent run.");
         }
-        this.stateManager.advanceGate(runId, action.nextPhase, action.checkpointSha);
-        return { ok: true, runId, nextPhase: action.nextPhase };
+        const nextPhase = this.stateManager.advanceGate(
+          runId,
+          action.nextPhase,
+          action.checkpointSha
+        );
+        return { ok: true, runId, nextPhase };
       }
       default:
         return assertNever(action);
@@ -529,15 +541,16 @@ export class FlywheelServer {
 
   private handleRequest(request: IncomingMessage, response: ServerResponse): void {
     if (request.method === "GET" && request.url === "/health") {
+      const snapshot = this.getLiveSnapshot();
       this.respondJson(response, 200, {
         ok: true,
-        generatedAt: this.snapshot.generatedAt,
+        generatedAt: snapshot.generatedAt,
       });
       return;
     }
 
     if (request.method === "GET" && request.url === "/snapshot") {
-      this.respondJson(response, 200, this.snapshot);
+      this.respondJson(response, 200, this.getLiveSnapshot());
       return;
     }
 
@@ -587,7 +600,22 @@ export class FlywheelServer {
       });
       return;
     }
-    const payload = await this.handleAction(action);
+
+    let payload: unknown;
+    try {
+      payload = await this.handleAction(action);
+    } catch (error) {
+      if (error instanceof GateTransitionError) {
+        this.respondJson(response, 400, {
+          ok: false,
+          error: error.message,
+        });
+        return;
+      }
+
+      throw error;
+    }
+
     await this.refreshAll();
     this.respondJson(response, 200, {
       ok: true,
@@ -607,6 +635,14 @@ export class FlywheelServer {
       type: "snapshot",
       payload: this.snapshot,
     });
+  }
+
+  private getLiveSnapshot(): DashboardSnapshot {
+    this.snapshot = this.withDerivedSnapshot({
+      ...this.snapshot,
+      generatedAt: new Date().toISOString(),
+    });
+    return this.snapshot;
   }
 
   private withDerivedSnapshot(snapshot: DashboardSnapshot): DashboardSnapshot {
@@ -656,8 +692,14 @@ export class FlywheelServer {
             : "This NTM build exposes pause/interrupt only; resume must be done by re-sending prompts.",
         },
         "gate.advance": {
-          enabled: Boolean(runId),
-          reason: runId ? undefined : "No local flywheel run is available to advance.",
+          enabled: Boolean(runId && run && nextPhaseFor(run.phase)),
+          reason: !runId
+            ? "No local flywheel run is available to advance."
+            : !run
+              ? "No local flywheel run is available to advance."
+              : nextPhaseFor(run.phase)
+                ? undefined
+                : `Phase "${run.phase}" is terminal; there is no further gate to advance.`,
         },
       },
     };

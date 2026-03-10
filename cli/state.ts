@@ -15,6 +15,37 @@ export type Phase = "plan" | "beads" | "swarm" | "review" | "deploy";
 export type RunStatus = "running" | "completed" | "failed" | "partial";
 export type GateStatus = "waiting" | "passed" | "skipped";
 
+export const PHASE_ORDER: readonly Phase[] = [
+  "plan",
+  "beads",
+  "swarm",
+  "review",
+  "deploy",
+];
+
+export function isPhase(value: unknown): value is Phase {
+  return (
+    typeof value === "string" &&
+    (PHASE_ORDER as readonly string[]).includes(value)
+  );
+}
+
+export function nextPhaseFor(current: Phase): Phase | null {
+  const idx = PHASE_ORDER.indexOf(current);
+  if (idx === -1 || idx === PHASE_ORDER.length - 1) {
+    return null;
+  }
+
+  return PHASE_ORDER[idx + 1];
+}
+
+export class GateTransitionError extends Error {
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = "GateTransitionError";
+  }
+}
+
 // ─── Row types ────────────────────────────────────────────────────────────────
 
 export interface WizardRun {
@@ -240,20 +271,46 @@ export class StateManager {
   }
 
   /** Advance the human gate to the next phase and optionally record a checkpoint SHA. */
-  advanceGate(runId: string, nextPhase: Phase, checkpointSha?: string): void {
-    // Capture current phase before overwriting it so the event log is complete.
+  advanceGate(runId: string, requestedNextPhase: unknown, checkpointSha?: string): Phase {
     const currentRun = this.getFlywheelRun(runId);
-    const previousPhase = currentRun?.phase;
+    if (!currentRun) {
+      throw new GateTransitionError(`Run not found: ${runId}`);
+    }
+
+    if (!isPhase(requestedNextPhase)) {
+      throw new GateTransitionError(`Invalid next phase: ${String(requestedNextPhase)}`);
+    }
+
+    const expectedNextPhase = nextPhaseFor(currentRun.phase);
+    if (!expectedNextPhase) {
+      throw new GateTransitionError(
+        `Phase "${currentRun.phase}" is terminal and cannot be advanced further.`
+      );
+    }
+
+    if (requestedNextPhase !== expectedNextPhase) {
+      throw new GateTransitionError(
+        `Illegal gate transition ${currentRun.phase} -> ${requestedNextPhase}; expected ${currentRun.phase} -> ${expectedNextPhase}.`
+      );
+    }
+
+    const recordedCheckpointSha = checkpointSha ?? currentRun.checkpoint_sha ?? null;
     this.db
       .prepare(
         `UPDATE flywheel_runs SET gate_passed_at = ?, phase = ?, checkpoint_sha = ? WHERE id = ?`
       )
-      .run(now(), nextPhase, checkpointSha ?? null, runId);
-    this.logEvent(runId, "gate_advanced", { previousPhase, nextPhase, checkpointSha }, {
-      phaseFrom: previousPhase,
-      phaseTo: nextPhase,
+      .run(now(), expectedNextPhase, recordedCheckpointSha, runId);
+    this.logEvent(runId, "gate_advanced", {
+      previousPhase: currentRun.phase,
+      nextPhase: expectedNextPhase,
+      checkpointSha: recordedCheckpointSha,
+    }, {
+      phaseFrom: currentRun.phase,
+      phaseTo: expectedNextPhase,
       actor: "human",
     });
+
+    return expectedNextPhase;
   }
 
   completeFlywheelRun(runId: string, costUsd: number, notes?: string): void {
