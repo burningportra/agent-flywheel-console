@@ -7,13 +7,20 @@
  */
 
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { assertFailure, runFlywheel } from "../setup.js";
+import {
+  assertFailure,
+  assertSuccess,
+  cleanupTestProject,
+  hasSshConfig,
+  runFlywheel,
+  runFlywheelWithDiagnostics,
+} from "../setup.js";
 
 interface TempEnv {
   homeDir: string;
@@ -28,9 +35,28 @@ interface TimedLine {
 }
 
 const CLI = resolve("dist/cli.js");
+const runVpsE2e = process.env.FLYWHEEL_TEST_E2E === "1" && hasSshConfig();
+const describeVps = runVpsE2e ? describe : describe.skip;
+const sourceSshYaml = join(homedir(), ".flywheel", "ssh.yaml");
+const sourceProvidersYaml = join(homedir(), ".flywheel", "providers.yaml");
+const projectName = `fw-monitor-${Date.now().toString(36)}`;
+const sessionName = slugify(projectName);
 
-function createTempEnv(): TempEnv {
+let remoteWorkspaceDir = "";
+let remoteProjectDir = "";
+let remoteEnv: TempEnv | null = null;
+
+function createTempEnv(copySshConfig = false): TempEnv {
   const homeDir = mkdtempSync(join(tmpdir(), "flywheel-monitor-e2e-home-"));
+  if (copySshConfig) {
+    if (!existsSync(sourceSshYaml)) {
+      throw new Error(`Missing SSH config at ${sourceSshYaml}`);
+    }
+    cpSync(sourceSshYaml, join(homeDir, "ssh.yaml"));
+    if (existsSync(sourceProvidersYaml)) {
+      cpSync(sourceProvidersYaml, join(homeDir, "providers.yaml"));
+    }
+  }
   return {
     homeDir,
     env: {
@@ -45,6 +71,14 @@ function createTempEnv(): TempEnv {
 
 function nowIso(): string {
   return new Date().toISOString();
+}
+
+function slugify(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }
 
 function stripAnsi(input: string): string {
@@ -121,6 +155,31 @@ async function waitForExit(
   });
 }
 
+function spawnFlywheel(
+  args: string[],
+  env: Record<string, string>,
+  cwd?: string
+): ChildProcessWithoutNullStreams {
+  return spawn("node", [CLI, ...args], {
+    cwd,
+    env: {
+      ...process.env,
+      NO_COLOR: "1",
+      FORCE_COLOR: "0",
+      ...env,
+    },
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+}
+
+function dumpTranscript(label: string, lines: TimedLine[]): void {
+  console.log(`[E2E][${label}] transcript start`);
+  for (const entry of lines) {
+    console.log(`[E2E][${label}] [${entry.at}] ${entry.stream} | ${stripAnsi(entry.line)}`);
+  }
+  console.log(`[E2E][${label}] transcript end`);
+}
+
 describe("monitor/autopilot long-running control surfaces", () => {
   it("monitor shows actionable warning when SSH is unavailable", () => {
     const t = createTempEnv();
@@ -140,15 +199,7 @@ describe("monitor/autopilot long-running control surfaces", () => {
 
   it("autopilot emits startup/heartbeat output and exits cleanly on SIGINT", async () => {
     const t = createTempEnv();
-    const child = spawn("node", [CLI, "autopilot", "--interval", "1"], {
-      env: {
-        ...process.env,
-        NO_COLOR: "1",
-        FORCE_COLOR: "0",
-        ...t.env,
-      },
-      stdio: ["pipe", "pipe", "pipe"],
-    });
+    const child = spawnFlywheel(["autopilot", "--interval", "1"], t.env);
 
     const lines = captureProcessLines(child);
     try {
@@ -170,14 +221,119 @@ describe("monitor/autopilot long-running control surfaces", () => {
       if (child.exitCode === null) {
         child.kill("SIGKILL");
       }
-      console.log("[E2E][remote-04-monitor-autopilot] transcript start");
-      for (const entry of lines) {
-        console.log(
-          `[E2E][remote-04-monitor-autopilot] [${entry.at}] ${entry.stream} | ${stripAnsi(entry.line)}`
-        );
-      }
-      console.log("[E2E][remote-04-monitor-autopilot] transcript end");
+      dumpTranscript("remote-04-monitor-autopilot-local", lines);
       t.cleanup();
     }
   }, 40_000);
+});
+
+describeVps("monitor/autopilot VPS-backed happy paths", () => {
+  beforeAll(async () => {
+    remoteEnv = createTempEnv(true);
+    remoteWorkspaceDir = mkdtempSync(join(tmpdir(), "flywheel-monitor-e2e-ws-"));
+    remoteProjectDir = join(remoteWorkspaceDir, projectName);
+    mkdirSync(remoteProjectDir, { recursive: true });
+
+    const initResult = await runFlywheelWithDiagnostics(["init", projectName], {
+      cwd: remoteProjectDir,
+      env: remoteEnv.env,
+      timeout: 120_000,
+      remoteDiagnostics: true,
+      remoteProjectName: projectName,
+    });
+    assertSuccess(initResult, "remote init for monitor/autopilot");
+
+    const swarmResult = await runFlywheelWithDiagnostics(["swarm", "1", "--no-commit"], {
+      cwd: remoteProjectDir,
+      env: remoteEnv.env,
+      timeout: 180_000,
+      remoteDiagnostics: true,
+      remoteProjectName: projectName,
+    });
+    assertSuccess(swarmResult, "remote swarm bootstrap for monitor/autopilot");
+  }, 240_000);
+
+  afterAll(async () => {
+    try {
+      await cleanupTestProject(projectName);
+    } finally {
+      if (remoteWorkspaceDir) {
+        rmSync(remoteWorkspaceDir, { recursive: true, force: true });
+      }
+      remoteEnv?.cleanup();
+      remoteWorkspaceDir = "";
+      remoteProjectDir = "";
+      remoteEnv = null;
+    }
+  });
+
+  it("monitor renders remote SSH/session/agent state and exits cleanly on SIGINT", async () => {
+    if (!remoteEnv) {
+      throw new Error("Remote env was not initialized.");
+    }
+
+    const child = spawnFlywheel(
+      ["monitor", "--interval", "1", "--session", sessionName],
+      remoteEnv.env,
+      remoteProjectDir
+    );
+    const lines = captureProcessLines(child);
+
+    try {
+      await waitForLine(lines, /Flywheel Monitor/i, 15_000);
+      await waitForLine(lines, /latency\s+\d+ms|SSH .* latency/i, 20_000);
+      await waitForLine(lines, /NTM Sessions/i, 20_000);
+      await waitForLine(lines, new RegExp(sessionName, "i"), 20_000);
+      await waitForLine(lines, /Agent Activity|pane\s+\d+/i, 20_000);
+
+      await new Promise((resolve) => setTimeout(resolve, 1_500));
+      child.kill("SIGINT");
+      const code = await waitForExit(child, 10_000);
+      expect(code).toBe(0);
+
+      const merged = lines.map((entry) => stripAnsi(entry.line)).join("\n");
+      expect(merged).toMatch(new RegExp(sessionName, "i"));
+      expect(merged).toMatch(/Agent Activity|pane\s+\d+/i);
+      expect(merged).toMatch(/Monitor stopped/i);
+      expect(merged).not.toMatch(/Cannot connect|NTM unreachable/i);
+    } finally {
+      if (child.exitCode === null) {
+        child.kill("SIGKILL");
+      }
+      dumpTranscript("remote-04-monitor-autopilot-monitor-vps", lines);
+    }
+  }, 60_000);
+
+  it("autopilot shows remote bead stats instead of falling back to local-only mode", async () => {
+    if (!remoteEnv) {
+      throw new Error("Remote env was not initialized.");
+    }
+
+    const child = spawnFlywheel(["autopilot", "--interval", "1"], remoteEnv.env, remoteProjectDir);
+    const lines = captureProcessLines(child);
+
+    try {
+      await waitForLine(lines, /Starting flywheel autopilot/i, 10_000);
+      await waitForLine(lines, /Flywheel Autopilot|poll 1/i, 10_000);
+      await waitForLine(lines, /Current run:/i, 15_000);
+      await waitForLine(lines, /Beads \(remote\):/i, 20_000);
+      await waitForLine(lines, /Next poll in/i, 10_000);
+
+      await new Promise((resolve) => setTimeout(resolve, 1_500));
+      child.kill("SIGINT");
+      const code = await waitForExit(child, 10_000);
+      expect(code).toBe(0);
+
+      const merged = lines.map((entry) => stripAnsi(entry.line)).join("\n");
+      expect(merged).toMatch(/Current run:/i);
+      expect(merged).toMatch(/Beads \(remote\):/i);
+      expect(merged).toMatch(/Autopilot stopped/i);
+      expect(merged).not.toMatch(/local-only mode|SSH offline/i);
+    } finally {
+      if (child.exitCode === null) {
+        child.kill("SIGKILL");
+      }
+      dumpTranscript("remote-04-monitor-autopilot-autopilot-vps", lines);
+    }
+  }, 60_000);
 });
