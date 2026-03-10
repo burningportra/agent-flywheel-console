@@ -20,7 +20,7 @@ import { describe, it, expect } from "vitest";
 // For now, use the runRollback path with force:true and bad SHA:
 
 import { runRollback } from "../../cli/rollback.js";
-import { tempDir } from "../helpers.js";
+import { captureConsole, stripAnsi, tempDir } from "../helpers.js";
 import { join } from "node:path";
 import { writeFileSync, mkdirSync } from "node:fs";
 import yaml from "js-yaml";
@@ -53,6 +53,31 @@ function setupRollbackEnv(sha: string): { dir: ReturnType<typeof tempDir>; runId
   return { dir, runId };
 }
 
+async function runRollbackCaptured(): Promise<{
+  exitCode: number | undefined;
+  output: string;
+}> {
+  const c = captureConsole();
+  let exitCode: number | undefined;
+  const origExit = process.exit.bind(process);
+  (process as NodeJS.Process & { exit: (code?: number) => never }).exit = ((code?: number) => {
+    exitCode = code;
+    throw new Error(`process.exit unexpectedly called with "${code}"`);
+  }) as typeof process.exit;
+
+  try {
+    await runRollback({ force: true });
+  } catch {
+    // expected: runRollback uses process.exit for terminal failure paths
+  } finally {
+    (process as NodeJS.Process & { exit: (code?: number) => never }).exit = origExit as typeof process.exit;
+  }
+
+  const output = stripAnsi(`${c.out}\n${c.err}`);
+  c.restore();
+  return { exitCode, output };
+}
+
 describe("rollback SHA validation (assertSafeSha)", () => {
   it("accepts a valid 40-char hex SHA", async () => {
     const sha = "abc123def456abc123def456abc123def456abc1";
@@ -60,18 +85,15 @@ describe("rollback SHA validation (assertSafeSha)", () => {
     process.env.FLYWHEEL_HOME = dir.path;
     process.env.FLYWHEEL_STATE_DB = join(dir.path, "state.db");
     try {
-      // With force:true it skips confirmation; the error should come from SSH
-      // connect failure (not SHA validation), meaning SHA passed validation.
-      await expect(
-        runRollback({ force: true })
-      ).rejects.toThrow(); // SSH failure, not SHA failure
+      const result = await runRollbackCaptured();
+      expect(result.exitCode).toBe(1);
+      expect(result.output).not.toMatch(/Invalid checkpoint SHA/);
+      expect(result.output).toMatch(/SSH error|private key/i);
     } finally {
       delete process.env.FLYWHEEL_HOME;
       delete process.env.FLYWHEEL_STATE_DB;
       dir.cleanup();
     }
-    // If we reach here, SHA validation passed (error was from SSH, not SHA check)
-    // We verify indirectly by checking the error message doesn't mention "Invalid checkpoint SHA"
   }, 8_000);
 
   it("rejects a SHA with shell metacharacters", async () => {
@@ -80,7 +102,9 @@ describe("rollback SHA validation (assertSafeSha)", () => {
     process.env.FLYWHEEL_HOME = dir.path;
     process.env.FLYWHEEL_STATE_DB = join(dir.path, "state.db");
     try {
-      await expect(runRollback({ force: true })).rejects.toThrow(/Invalid checkpoint SHA/);
+      const result = await runRollbackCaptured();
+      expect(result.exitCode).toBe(1);
+      expect(result.output).toMatch(/Invalid checkpoint SHA/);
     } finally {
       delete process.env.FLYWHEEL_HOME;
       delete process.env.FLYWHEEL_STATE_DB;
@@ -94,7 +118,9 @@ describe("rollback SHA validation (assertSafeSha)", () => {
     process.env.FLYWHEEL_HOME = dir.path;
     process.env.FLYWHEEL_STATE_DB = join(dir.path, "state.db");
     try {
-      await expect(runRollback({ force: true })).rejects.toThrow(/Invalid checkpoint SHA/);
+      const result = await runRollbackCaptured();
+      expect(result.exitCode).toBe(1);
+      expect(result.output).toMatch(/Invalid checkpoint SHA/);
     } finally {
       delete process.env.FLYWHEEL_HOME;
       delete process.env.FLYWHEEL_STATE_DB;
@@ -108,7 +134,9 @@ describe("rollback SHA validation (assertSafeSha)", () => {
     process.env.FLYWHEEL_HOME = dir.path;
     process.env.FLYWHEEL_STATE_DB = join(dir.path, "state.db");
     try {
-      await expect(runRollback({ force: true })).rejects.toThrow(/Invalid checkpoint SHA/);
+      const result = await runRollbackCaptured();
+      expect(result.exitCode).toBe(1);
+      expect(result.output).toMatch(/Invalid checkpoint SHA/);
     } finally {
       delete process.env.FLYWHEEL_HOME;
       delete process.env.FLYWHEEL_STATE_DB;

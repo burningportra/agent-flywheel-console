@@ -95,14 +95,15 @@ export async function runRollback(opts: RollbackOptions = {}): Promise<void> {
     }
   }
 
-  // Validate SHA before any shell usage
-  assertSafeSha(run.checkpoint_sha);
-
   // Connect SSH and perform rollback
   const ssh = new SSHManager();
   let exitCode = 0;
 
   try {
+    // Validate the stored checkpoint before any SSH or shell usage so the
+    // operator gets a clean user-facing error instead of an uncaught stack trace.
+    assertSafeSha(run.checkpoint_sha);
+
     const config = await ssh.connect();
     const projectName = (run.project_name ?? "").trim();
     if (!projectName) {
