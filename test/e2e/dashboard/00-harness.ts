@@ -258,7 +258,19 @@ export async function startDashboardHarness(
     const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
     const fileName = `${String(screenshotIndex).padStart(2, "0")}-${ts}-${name}.png`;
     const filePath = join(dir, fileName);
-    await page.screenshot({ path: filePath, fullPage: true });
+    try {
+      await page.screenshot({ path: filePath, fullPage: true });
+    } catch (error) {
+      try {
+        appendFileSync(
+          join(dir, "screenshot-errors.log"),
+          `[${new Date().toISOString()}] ${name}: ${error instanceof Error ? error.message : String(error)}\n`,
+          "utf8"
+        );
+      } catch {
+        // best-effort — never fail a test because screenshot capture failed
+      }
+    }
     return filePath;
   };
 
