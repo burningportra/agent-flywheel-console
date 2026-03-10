@@ -1,0 +1,134 @@
+name: Flake Detection
+
+# Scheduled flake-detection run: executes the integration + local e2e suite
+# multiple times and flags tests that pass inconsistently.
+#
+# This workflow NEVER retries — it runs with --retry 0 so every failure is
+# counted as a genuine signal, not masked. The point is to surface tests that
+# sometimes pass and sometimes fail so they can be quarantined or fixed.
+#
+# Runs: nightly at 02:00 UTC, or manually via workflow_dispatch.
+
+on:
+  schedule:
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+    inputs:
+      note:
+        description: "Optional note for this manual run (recorded in workflow title)"
+        required: false
+        default: ""
+
+concurrency:
+  group: flake-detect
+  cancel-in-progress: false   # never cancel in-progress flake runs
+
+env:
+  NODE_VERSION: "20"
+  NO_COLOR: "1"
+  # DETECTION_RUNS input is informational only — the matrix is hardcoded to 5
+  # runs. GitHub Actions does not support dynamic matrix sizes without a
+  # separate job, which adds unnecessary complexity. Change the matrix array
+  # directly if you need a different run count.
+
+jobs:
+  flake-detect:
+    name: Flake Detection (${{ matrix.run }}/5)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    strategy:
+      fail-fast: false      # run all matrix jobs even if some fail
+      max-parallel: 3       # run 3 at a time to avoid resource starvation
+      matrix:
+        run: [1, 2, 3, 4, 5]
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+
+      - name: Run integration suite (no retry)
+        id: integration
+        continue-on-error: true
+        run: |
+          mkdir -p reports
+          npx vitest run test/integration \
+            --testTimeout 30000 \
+            --retry 0 \
+            --reporter=verbose \
+            --reporter=json \
+            --outputFile.json=reports/integration-run-${{ matrix.run }}.json
+
+      - name: Run local E2E suite (no retry)
+        id: e2e
+        continue-on-error: true
+        run: |
+          mkdir -p reports
+          npx vitest run \
+            test/e2e/local-commands.e2e.ts \
+            test/e2e/error-matrix \
+            test/e2e/concurrent \
+            --testTimeout 30000 \
+            --retry 0 \
+            --reporter=verbose \
+            --reporter=json \
+            --outputFile.json=reports/e2e-run-${{ matrix.run }}.json
+
+      - name: Upload run results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flake-run-${{ matrix.run }}-${{ github.run_id }}
+          path: reports/
+          retention-days: 30
+
+  # Aggregate: download all 5 run results and identify flaky tests
+  aggregate:
+    name: Analyze Flake Results
+    runs-on: ubuntu-latest
+    needs: flake-detect
+    if: always()
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+
+      - name: Download all run results
+        uses: actions/download-artifact@v4
+        with:
+          path: flake-results/
+          pattern: "flake-run-*"
+
+      - name: Analyze flake results
+        id: analyze
+        run: node scripts/analyze-flakes.js flake-results/
+
+      - name: Upload flake report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flake-report-${{ github.run_id }}
+          path: flake-report.json
+          retention-days: 90
+
+      - name: Fail if flakes exceed threshold
+        # More than 1 flaky test means the suite is unreliable — require triage.
+        run: |
+          FLAKY=$(node -e "
+            const r = require('./flake-report.json');
+            console.log(r.flakyTests ? r.flakyTests.length : 0);
+          ")
+          echo "Flaky tests found: $FLAKY"
+          if [ "$FLAKY" -gt 1 ]; then
+            echo "::error::Flake threshold exceeded: $FLAKY flaky tests. Quarantine or fix them."
+            exit 1
+          fi
