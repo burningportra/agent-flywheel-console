@@ -9,6 +9,42 @@ prompts:
     effort: max
     phase: plan
 
+  plan-synthesis:
+    text: |
+      You are consolidating three competing implementation plans for this idea:
+      {idea}
+
+      Plan A:
+      {plan_a}
+
+      Plan B:
+      {plan_b}
+
+      Plan C:
+      {plan_c}
+
+      Produce one unified plan that keeps the strongest parts of each candidate,
+      removes duplication, and resolves contradictions explicitly. Be concrete
+      about architecture, sequencing, risks, and boundaries.
+    model: opus
+    effort: max
+    phase: plan
+
+  plan-refine:
+    text: |
+      Refine this synthesized plan for the project idea:
+      {idea}
+
+      Current synthesis:
+      {synthesis_1}
+
+      Improve it by tightening sequencing, filling missing implementation details,
+      removing ambiguity, and calling out any risky assumptions that still need
+      validation. Return a sharper, more execution-ready version of the plan.
+    model: opus
+    effort: max
+    phase: plan
+
   plan-adversarial-challenge:
     text: |
       You are a skeptical senior engineer reviewing this plan before any code is
