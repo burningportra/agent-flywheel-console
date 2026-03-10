@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
+import packageJson from "../../package.json" with { type: "json" };
 
 const CLI = resolve("dist/cli.js");
 
@@ -13,6 +14,6 @@ describe("CLI integration: version contract", () => {
     });
 
     expect(result.status).toBe(0);
-    expect(result.stdout.trim()).toMatch(/^0\.\d+\.\d+$/);
+    expect(result.stdout.trim()).toBe(packageJson.version);
   });
 });

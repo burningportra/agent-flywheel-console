@@ -13,6 +13,7 @@ import yaml from "js-yaml";
 import { runFlywheel, assertSuccess, assertFailure } from "./setup.js";
 import { tempDir, stripAnsi, FIXTURE_SSH_CONFIG, FIXTURE_PROVIDERS_CONFIG } from "../helpers.js";
 import { initDb, StateManager } from "../../cli/state.js";
+import packageJson from "../../package.json" with { type: "json" };
 
 // ── Fixture setup ─────────────────────────────────────────────────────────────
 
@@ -48,7 +49,7 @@ describe("binary bootstrap", () => {
   it("--version outputs the package version", () => {
     const r = fly(["--version"]);
     assertSuccess(r, "--version");
-    expect(r.stdout.trim()).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(r.stdout.trim()).toBe(packageJson.version);
   });
 
   it("--help includes all main command names", () => {
