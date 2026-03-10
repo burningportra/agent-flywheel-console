@@ -1,10 +1,11 @@
 /**
  * test/unit/ntm-bridge-helpers.test.ts
  * Covers pure helpers in cli/ntm-bridge.ts:
- *   extractCurrentBead, parseTargetList, inferSpawnPaneCount, supportsResume
+ *   extractJson, extractCurrentBead, parseTargetList, supportsResume
  * Uses real imports — no mocks.
  */
 import { describe, it, expect } from "vitest";
+import { extractJson, NtmBridge, NtmParseError } from "../../cli/ntm-bridge.js";
 
 // These helpers are module-private, so we test via the exported NtmBridge class
 // and via the type system. Where needed, we replicate the regex logic to verify
@@ -85,8 +86,88 @@ describe("parseTargetList (NTM send response parser)", () => {
   });
 });
 
-// NtmBridge.supportsResume() — documented as always false for NTM v1.2.0
-import { NtmBridge } from "../../cli/ntm-bridge.js";
+describe("extractJson (guarded NTM JSON parser)", () => {
+  it("parses a plain JSON object", () => {
+    expect(extractJson<{ ok: boolean }>('{"ok":true}')).toEqual({ ok: true });
+  });
+
+  it("extracts JSON with log lines before and after the payload", () => {
+    const raw = [
+      "[ntm] loading config",
+      "[ntm] connected",
+      '{"session":"demo","delivered":1}',
+      "[ntm] done",
+    ].join("\n");
+
+    expect(extractJson<{ session: string; delivered: number }>(raw)).toEqual({
+      session: "demo",
+      delivered: 1,
+    });
+  });
+
+  it("extracts a JSON array payload", () => {
+    const raw = 'warn: noisy prefix\n[{"pane":1},{"pane":2}]\nwarn: noisy suffix';
+    expect(extractJson<Array<{ pane: number }>>(raw)).toEqual([
+      { pane: 1 },
+      { pane: 2 },
+    ]);
+  });
+
+  it("keeps searching after a non-JSON brace block and finds the real payload", () => {
+    const raw = 'debug {not-json}\n{"ok":true,"message":"usable payload"}';
+    expect(extractJson<{ ok: boolean; message: string }>(raw)).toEqual({
+      ok: true,
+      message: "usable payload",
+    });
+  });
+
+  it("handles nested braces inside JSON strings", () => {
+    const raw =
+      'log prefix\n{"message":"brace } and [still string]","nested":{"ok":true}}\nlog suffix';
+    expect(
+      extractJson<{ message: string; nested: { ok: boolean } }>(raw)
+    ).toEqual({
+      message: "brace } and [still string]",
+      nested: { ok: true },
+    });
+  });
+
+  it("prefers the later payload over earlier structured JSON log lines", () => {
+    const raw = [
+      '{"level":"info","message":"warmup","details":{"tokens":[1,2,3],"state":"booting","meta":{"phase":"init"}}}',
+      '{"session":"demo","delivered":3,"targets":[1,2,3]}',
+    ].join("\n");
+
+    expect(
+      extractJson<{ session: string; delivered: number; targets: number[] }>(raw)
+    ).toEqual({
+      session: "demo",
+      delivered: 3,
+      targets: [1, 2, 3],
+    });
+  });
+
+  it("rejects inner JSON fragments from a malformed outer block", () => {
+    const raw = 'debug {"state":[1,2],"oops": }\nnot-json tail';
+    expect(() => extractJson(raw)).toThrow(NtmParseError);
+  });
+
+  it("throws NtmParseError when no JSON exists and truncates raw output", () => {
+    const raw = "x".repeat(700);
+
+    expect(() => extractJson(raw)).toThrow(NtmParseError);
+
+    try {
+      extractJson(raw);
+      throw new Error("expected extractJson to throw");
+    } catch (error) {
+      expect(error).toBeInstanceOf(NtmParseError);
+      expect((error as NtmParseError).rawOutput).toHaveLength(500);
+    }
+  });
+});
+
+// NtmBridge.supportsResume() — documented as always false for the installed build
 import { RemoteCommandRunner } from "../../cli/remote.js";
 import { SSHManager } from "../../cli/ssh.js";
 

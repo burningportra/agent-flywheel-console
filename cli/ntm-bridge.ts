@@ -111,6 +111,68 @@ export class NtmBridgeError extends Error {
   }
 }
 
+export class NtmParseError extends NtmBridgeError {
+  readonly rawOutput: string;
+
+  constructor(message: string, rawOutput: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = "NtmParseError";
+    this.rawOutput = truncateRawOutput(rawOutput);
+  }
+}
+
+export function extractJson<T = unknown>(raw: string): T {
+  let bestCandidate:
+    | {
+        startIndex: number;
+        length: number;
+        value: T;
+      }
+    | undefined;
+  let lastParseError: Error | undefined;
+
+  for (const block of findTopLevelJsonBlocks(raw)) {
+    const candidate = raw.slice(block.startIndex, block.endIndex + 1);
+
+    try {
+      const value = JSON.parse(candidate) as T;
+
+      // Prefer the latest top-level JSON block. Real command payloads tend to be
+      // emitted after any noisy prefix logs, while nested fragments inside a
+      // malformed outer block must not be treated as standalone payloads.
+      if (
+        !bestCandidate ||
+        block.startIndex > bestCandidate.startIndex ||
+        (block.startIndex === bestCandidate.startIndex &&
+          candidate.length > bestCandidate.length)
+      ) {
+        bestCandidate = {
+          startIndex: block.startIndex,
+          length: candidate.length,
+          value,
+        };
+      }
+    } catch (error) {
+      lastParseError =
+        error instanceof Error ? error : new Error(String(error));
+    }
+  }
+
+  if (bestCandidate) {
+    return bestCandidate.value;
+  }
+
+  if (lastParseError) {
+    throw new NtmParseError(
+      `Invalid JSON in NTM output: ${lastParseError.message}`,
+      raw,
+      { cause: lastParseError }
+    );
+  }
+
+  throw new NtmParseError(`No JSON found in NTM output (${raw.length} chars)`, raw);
+}
+
 export class NtmBridge {
   private readonly idleSnapshots = new Map<string, IdleSnapshot>();
 
@@ -278,15 +340,20 @@ export class NtmBridge {
     }
 
     try {
-      return JSON.parse(result.stdout) as T;
+      return extractJson<T>(result.stdout);
     } catch (error) {
-      const stderrHint = result.stderr.trim()
-        ? ` stderr: ${result.stderr.trim()}`
-        : "";
-      throw new NtmBridgeError(
-        `Failed to parse NTM JSON output for "${command}".${stderrHint}`,
-        { cause: error instanceof Error ? error : undefined }
-      );
+      if (error instanceof NtmParseError) {
+        const stderrHint = result.stderr.trim()
+          ? ` stderr: ${result.stderr.trim()}`
+          : "";
+        throw new NtmParseError(
+          `Failed to parse NTM JSON output for "${command}": ${error.message}.${stderrHint}`,
+          result.stdout,
+          { cause: error }
+        );
+      }
+
+      throw error;
     }
   }
 }
@@ -333,3 +400,83 @@ function extractCurrentBead(title: string | undefined): string | undefined {
   return match?.[0];
 }
 
+function findTopLevelJsonBlocks(
+  raw: string
+): Array<{
+  startIndex: number;
+  endIndex: number;
+}> {
+  const blocks: Array<{ startIndex: number; endIndex: number }> = [];
+  const stack: string[] = [];
+  let inString = false;
+  let escaped = false;
+  let blockStart: number | null = null;
+
+  for (let index = 0; index < raw.length; index += 1) {
+    const char = raw[index];
+
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+
+      if (char === "\\") {
+        escaped = true;
+        continue;
+      }
+
+      if (char === "\"") {
+        inString = false;
+      }
+
+      continue;
+    }
+
+    if (char === "\"") {
+      inString = true;
+      continue;
+    }
+
+    if (char === "{") {
+      if (stack.length === 0) {
+        blockStart = index;
+      }
+      stack.push("}");
+      continue;
+    }
+
+    if (char === "[") {
+      if (stack.length === 0) {
+        blockStart = index;
+      }
+      stack.push("]");
+      continue;
+    }
+
+    if (char === "}" || char === "]") {
+      const expected = stack.at(-1);
+      if (expected !== char) {
+        stack.length = 0;
+        blockStart = null;
+        continue;
+      }
+
+      stack.pop();
+
+      if (stack.length === 0 && blockStart !== null) {
+        blocks.push({
+          startIndex: blockStart,
+          endIndex: index,
+        });
+        blockStart = null;
+      }
+    }
+  }
+
+  return blocks;
+}
+
+function truncateRawOutput(raw: string, maxLength = 500): string {
+  return raw.length <= maxLength ? raw : raw.slice(0, maxLength);
+}
