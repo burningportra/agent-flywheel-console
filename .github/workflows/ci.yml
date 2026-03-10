@@ -203,6 +203,8 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: dist-${{ github.sha }}
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
       - name: Run full suite with coverage enforcement
         run: npm run test:coverage -- --testTimeout 30000 --reporter=dot
       - name: Upload merged coverage report
