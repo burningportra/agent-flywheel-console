@@ -1,4 +1,3 @@
-# Beads Project Configuration
-# issue_prefix: agent-flywheel-console
-# default_priority: 2
-# default_type: task
+# Mixed historical issue IDs use both `agent-*` and `agent-flywheel-console-*`.
+# Keep the broader prefix so br accepts the full tracker history.
+issue_prefix: agent
