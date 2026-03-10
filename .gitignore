@@ -21,3 +21,13 @@ Thumbs.db
 # Logs
 *.log
 wizard-log.jsonl
+
+# bv (beads viewer) local config and caches
+.bv/
+
+# Test artifacts (transcripts from CI/E2E runs)
+# Written by test/e2e/setup.ts when CI=true or FLYWHEEL_TEST_ARTIFACTS=1
+test-artifacts/
+
+# Coverage reports
+coverage/
