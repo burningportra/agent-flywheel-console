@@ -1,16 +1,18 @@
 import { describe, expect, it } from "vitest";
+import { spawnSync } from "node:child_process";
+import { resolve } from "node:path";
 
-import { runProcess } from "../helpers/process.js";
+const CLI = resolve("dist/cli.js");
 
 describe("CLI integration: version contract", () => {
-  it("prints semantic version and exits 0", async () => {
-    const result = await runProcess("npx", ["tsx", "cli/index.ts", "--version"], {
-      cwd: process.cwd(),
-      env: process.env,
-      timeoutMs: 20_000,
+  it("prints semantic version and exits 0", () => {
+    const result = spawnSync("node", [CLI, "--version"], {
+      encoding: "utf8",
+      env: { ...process.env, NO_COLOR: "1" },
+      timeout: 10_000,
     });
 
-    expect(result.code).toBe(0);
+    expect(result.status).toBe(0);
     expect(result.stdout.trim()).toMatch(/^0\.\d+\.\d+$/);
   });
 });
