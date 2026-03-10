@@ -93,7 +93,9 @@ describe("Multi-process reads — WAL mode allows parallel SELECT", () => {
 
   // 5 sequential subprocesses × ~600ms each under normal load;
   // up to 1-2s each under system pressure from parallel Playwright tests.
-  it("5 repeated-process flywheel runs all exit 0 — no reader blocks reader", () => {
+  // Per-test timeout of 25s keeps the full suite green without raising the
+  // global 10s ceiling for the rest of the unit/contract suite.
+  it("5 repeated-process flywheel runs all exit 0 — no reader blocks reader", { timeout: 25_000 }, () => {
     const db = initDb(join(dir.path, "concurrent-test", "state.db"));
     const sm = new StateManager(db);
     for (let i = 0; i < 3; i++) {
