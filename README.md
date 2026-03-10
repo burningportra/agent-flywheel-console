@@ -106,6 +106,39 @@ npm run build                  # Bundle to dist/cli.js
 npm run typecheck              # Type check without emit
 ```
 
+## Testing
+
+No-mock default: tests use real SQLite, real process spawning, real HTTP/WebSocket. See `docs/testing-policy.md`.
+
+```bash
+npm test                       # Full suite (unit + contract + integration + local e2e)
+npm run test:unit              # Unit tests only (fast, no I/O)
+npm run test:integration       # Integration tests (real processes, temp dirs, no VPS)
+npm run test:e2e:local         # Local e2e tests (real binary, no VPS)
+npm run test:coverage          # Full suite with coverage report
+FLYWHEEL_TEST_E2E=1 npm run test:e2e  # VPS e2e (requires ssh.yaml configured)
+```
+
+## CI
+
+GitHub Actions (`.github/workflows/ci.yml`) runs these stages on every push/PR:
+
+| Stage | What | Trigger |
+|-------|------|---------|
+| Type-check & Build | `tsc --noEmit` + esbuild + vite | Always |
+| Unit Tests | `test/unit/**` with coverage | Always |
+| Contract Tests | `test/contract/**` (HTTP/WS shape) | Always |
+| Integration Tests | `test/integration/**` (real processes) | Always |
+| E2E Local | `test/e2e/local-commands.e2e.ts` | Always |
+| E2E VPS | Full VPS orchestration | Push to `main` + `FLYWHEEL_VPS_HOST` set |
+| Coverage Gate | Merged coverage thresholds (vitest.config.ts) | Always |
+
+To enable VPS E2E in CI, set these in repository Settings → Variables/Secrets:
+- `FLYWHEEL_VPS_HOST` — VPS IP or hostname
+- `FLYWHEEL_VPS_USER` — SSH user (default: `ubuntu`)
+- `FLYWHEEL_REMOTE_REPO_ROOT` — remote path prefix (default: `/home/ubuntu/projects`)
+- `FLYWHEEL_SSH_KEY` — private key contents (secret)
+
 ## Source Location
 
 The canonical source lives at: `/home/ubuntu/.openclaw/workspace/agent-flywheel-console/`

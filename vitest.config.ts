@@ -11,6 +11,7 @@ export default defineConfig({
     //   - VPS E2E: opt-in via FLYWHEEL_TEST_E2E=1
     //   - Live provider tests: opt-in via FLYWHEEL_TEST_LIVE=1
     include: [
+      "test/contract/**/*.test.ts",
       "test/unit/**/*.test.ts",
       "test/integration/**/*.test.ts",
       // Local E2E (no VPS needed) — always included
@@ -20,7 +21,10 @@ export default defineConfig({
       // so they self-skip without FLYWHEEL_TEST_E2E=1. Non-VPS validation tests
       // (argument validation, confirmation rejection, etc.) always run.
       "test/e2e/lifecycle/**/*.e2e.ts",
+      "test/e2e/remote/**/*.e2e.ts",
       "test/e2e/ssh-connectivity.e2e.ts",
+      "test/e2e/error-matrix/**/*.e2e.ts",
+      "test/e2e/concurrent/**/*.e2e.ts",
       ...(process.env.FLYWHEEL_TEST_LIVE ? ["test/live/**/*.test.ts"] : []),
     ],
 
@@ -35,6 +39,14 @@ export default defineConfig({
 
     // Timeout: 10s for unit tests, longer for integration
     testTimeout: 10_000,
+
+    // Retry policy: integration and e2e tests may flake due to process startup
+    // timing, port allocation, or temp-dir contention. Allow up to 1 retry
+    // before marking a test as failed. Unit tests never retry (if they flake,
+    // the test logic is wrong). Retry is controlled per-run via CLI --retry flag
+    // so unit runs stay strict. This default is intentionally low — see
+    // docs/flake-policy.md for the full quarantine workflow.
+    retry: 0, // default off; CI overrides per stage via --retry flag
 
     // Print test names as they run for debugging
     reporter: ["verbose"],

@@ -64,6 +64,7 @@ export interface RunFlywheelOptions {
   stdin?: string;
   timeout?: number;
   silent?: boolean;
+  cwd?: string;
   remoteDiagnostics?: boolean;
   remoteProjectName?: string;
 }
@@ -130,10 +131,12 @@ function executeFlywheel(
     FORCE_COLOR: "0",
     ...(opts.env ?? {}),
   };
-  const envSummary = buildEnvSummary(effectiveEnv, opts.env ?? {});
+  const commandCwd = opts.cwd ?? process.cwd();
+  const envSummary = buildEnvSummary(effectiveEnv, opts.env ?? {}, commandCwd);
   const startedAt = Date.now();
   const result = spawnSync("node", [CLI, ...args], {
     encoding: "utf8",
+    cwd: commandCwd,
     env: effectiveEnv,
     input: opts.stdin,
     timeout: opts.timeout ?? 30_000,
@@ -191,14 +194,15 @@ function maybeWriteTranscript(args: string[], result: E2EResult): void {
 
 function buildEnvSummary(
   effectiveEnv: NodeJS.ProcessEnv,
-  extraEnv: Record<string, string>
+  extraEnv: Record<string, string>,
+  cwd: string
 ): E2EEnvSummary {
   const flywheelHome = effectiveEnv.FLYWHEEL_HOME ?? join(homedir(), ".flywheel");
   const stateDbPath = effectiveEnv.FLYWHEEL_STATE_DB ?? join(flywheelHome, "state.db");
   const sshConfigPath = join(flywheelHome, "ssh.yaml");
 
   return {
-    cwd: process.cwd(),
+    cwd,
     ci: Boolean(effectiveEnv.CI),
     flywheelHome,
     stateDbPath,

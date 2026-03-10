@@ -78,6 +78,11 @@ export class SwarmCoordinator {
       throw new Error(`Swarm count must be a positive integer. Received: ${count}`);
     }
 
+    if (options.runId) {
+      // Existing runs may already have accumulated spend, so fail before any SSH/NTM work.
+      this.assertBudget(options.runId, options.budgetUsd);
+    }
+
     const sshConfig = await this.ssh.connect();
     const remoteProjectPath =
       options.remoteProjectPath ?? `${trimTrailingSlash(sshConfig.remoteRepoRoot)}/${projectName}`;
@@ -89,7 +94,9 @@ export class SwarmCoordinator {
     const runId = options.runId ?? this.state.createFlywheelRun(projectName, "swarm");
 
     // Budget check: meaningful for resumed runs; always passes for brand-new ones.
-    this.assertBudget(runId, options.budgetUsd);
+    if (!options.runId) {
+      this.assertBudget(runId, options.budgetUsd);
+    }
 
     try {
       const checkpoint = await this.remote.runRemote("git rev-parse HEAD", {
@@ -322,4 +329,3 @@ export function defaultSessionName(projectName: string): string {
   }
   return sanitized;
 }
-
