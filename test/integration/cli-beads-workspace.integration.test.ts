@@ -185,8 +185,8 @@ describe("flywheel beads history — local-only, no VPS", () => {
     const r = fly(["beads", "history", "--at", "2h"]);
     assertSuccess(r, "beads history --at 2h");
     const out = stripAnsi(r.stdout);
-    expect(out).toContain("41");   // closed count from 3h-ago snapshot
-    expect(out).not.toContain("89"); // must NOT see the 1h snapshot data
+    expect(out).toMatch(/Closed:\s+41\b/); // closed count from 3h-ago snapshot
+    expect(out).not.toMatch(/Closed:\s+89\b/); // must NOT see the 1h snapshot data
   });
 
   it("--at with invalid value exits 1 with a helpful error", () => {
