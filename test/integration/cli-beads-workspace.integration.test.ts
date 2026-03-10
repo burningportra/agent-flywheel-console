@@ -171,22 +171,30 @@ describe("flywheel beads history — local-only, no VPS", () => {
     const sm = seedSm();
     const runId = sm.createFlywheelRun("p", "swarm");
     const db = initDb(join(dir.path, "state.db"));
-    // Use distinctive numbers: 3h-ago snapshot has closed_count=41, 1h-ago has closed_count=89
-    // Asking --at 2h should show the 3h snapshot (41 closed) and NOT the 1h snapshot (89 closed)
-    db.prepare(`
-      INSERT INTO bead_snapshots (run_id, captured_at, bead_count, closed_count, blocked_count)
-      VALUES (?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-3 hours'), 100, 41, 0)
-    `).run(runId);
-    db.prepare(`
-      INSERT INTO bead_snapshots (run_id, captured_at, bead_count, closed_count, blocked_count)
-      VALUES (?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 hour'), 100, 89, 0)
-    `).run(runId);
 
-    const r = fly(["beads", "history", "--at", "2h"]);
-    assertSuccess(r, "beads history --at 2h");
+    // Use FIXED absolute timestamps so the test is immune to system-load timing
+    // drift when the subprocess computes Date.now().  Relative timestamps
+    // (strftime 'now - 3h') evaluated at insertion time vs. parseDuration("2h")
+    // evaluated at subprocess spawn time can diverge under heavy parallel load.
+    const older = "2025-06-01T09:00:00.000Z"; // firmly in the past, closed=41
+    const newer = "2025-06-01T11:00:00.000Z"; // 2h later, closed=89
+    const cutoff = "2025-06-01T10:00:00Z";     // between the two snapshots
+
+    db.prepare(`
+      INSERT INTO bead_snapshots (run_id, captured_at, bead_count, closed_count, blocked_count)
+      VALUES (?, ?, 100, 41, 0)
+    `).run(runId, older);
+    db.prepare(`
+      INSERT INTO bead_snapshots (run_id, captured_at, bead_count, closed_count, blocked_count)
+      VALUES (?, ?, 100, 89, 0)
+    `).run(runId, newer);
+
+    // --at with an explicit ISO timestamp: should show only the 09:00 snapshot
+    const r = fly(["beads", "history", "--at", cutoff]);
+    assertSuccess(r, "beads history --at <iso>");
     const out = stripAnsi(r.stdout);
-    expect(out).toContain("41");   // closed count from 3h-ago snapshot
-    expect(out).not.toContain("89"); // must NOT see the 1h snapshot data
+    expect(out).toContain("41");          // closed count from older snapshot
+    expect(out).not.toContain("89");      // must NOT see the newer snapshot
   });
 
   it("--at with invalid value exits 1 with a helpful error", () => {
