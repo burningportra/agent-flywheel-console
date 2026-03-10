@@ -47,6 +47,55 @@ These are minimums for completion of the full testing program:
 4. No-mock policy is documented and referenced by review process.
 5. Risk matrix workflows above are all covered according to required depth.
 
+## Runner Architecture
+
+### Why Vitest
+
+**Vitest** was chosen over Jest, Mocha, and node:test for these reasons:
+
+| Requirement | Vitest | Jest | Mocha | node:test |
+|-------------|--------|------|-------|-----------|
+| Native ESM (no transform) | ✓ | requires config | requires esm flag | ✓ |
+| TypeScript without emit | ✓ (tsx) | requires Babel/ts-jest | requires ts-node | partial |
+| Built-in coverage (v8) | ✓ | requires c8/v8 separately | requires nyc | external |
+| Per-file module isolation | ✓ (isolate: true) | global by default | no | no |
+| Watch mode + HMR | ✓ | ✓ | external | no |
+| Timeout + retry per test | ✓ | ✓ | ✓ | no |
+
+ESM-native is non-negotiable: the CLI is built with esbuild as ESM, and test imports must resolve the same module graph.
+
+### Key Configuration Decisions
+
+All decisions live in `vitest.config.ts`:
+
+| Setting | Value | Why |
+|---------|-------|-----|
+| `environment` | `node` | No DOM, no jsdom — this is a CLI, not a browser app |
+| `isolate` | `true` | Each test file gets a fresh V8 module registry; prevents shared state between `loadPrompts()` cache and similar singletons |
+| `testTimeout` | `10_000` ms | Default for unit/contract. Integration and e2e override per-run via `--testTimeout 30000` |
+| `retry` | `0` (default) | No masking of failures at the config level; CI stages opt-in via `--retry 1` |
+| `coverage.provider` | `v8` | Built into Node.js; no native code required; accurate for ESM |
+| `coverage.reporter` | `text, lcov, html` | Human-readable (text), LCOV for CI integrations, HTML for local browsing |
+
+### Test File Naming Conventions
+
+| Pattern | Layer | Runner config |
+|---------|-------|---------------|
+| `test/unit/**/*.test.ts` | Unit — pure functions, no I/O | Default 10s timeout, retry 0 |
+| `test/contract/**/*.test.ts` | HTTP/WS shape contracts | Default 10s, retry 0 |
+| `test/integration/**/*.test.ts` | Subprocesses, temp dirs | 30s timeout, retry 1 in CI |
+| `test/e2e/local-commands.e2e.ts` | Real binary, no VPS | 30s timeout, retry 1 in CI |
+| `test/e2e/**/*.e2e.ts` | VPS E2E (opt-in) | 60s timeout, retry 2 in CI |
+| `test/live/**/*.test.ts` | Real API calls (opt-in) | Requires `FLYWHEEL_TEST_LIVE=1` |
+
+### Adding a New Test Tier
+
+1. Choose the correct directory (see naming conventions above).
+2. Add the glob to `vitest.config.ts` → `test.include`.
+3. Add a dedicated `npm run test:mytier` script to `package.json`.
+4. Add a stage to `.github/workflows/ci.yml` with the appropriate `--testTimeout` and `--retry` values.
+5. Document any env vars or secrets required in the CI stage and in this file.
+
 ## Mapping to Bead Structure
 - `2pl.1.*`: policy, risk inventory, env strategy, DoD/thresholds
 - `2pl.2.*`: unit harness and deterministic module tests
