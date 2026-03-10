@@ -1,0 +1,61 @@
+# Build artifacts — generated files, not source
+dist/
+dashboard/dist/
+
+# Dependencies
+node_modules/
+
+# ──────────────────────────────────────────────────────────────────────────────
+# UBS FALSE-POSITIVE DOCUMENTATION
+# Reviewed 2026-03-10 by GoldRiver after full manual inspection.
+#
+# WARNING: "Many console.* statements" (317)
+#   FALSE POSITIVE — This is a CLI tool. console.log IS the user interface.
+#   There is no browser; there is no logging framework to use.
+#   Every console.* call is intentional CLI output. Do not suppress.
+#
+# WARNING: "Switch cases may be missing break" (6)
+#   FALSE POSITIVE — All switch statements use `return` in every case branch.
+#   Manual inspection of server.ts and monitor.ts confirmed zero fall-throughs.
+#   UBS counts these because it looks for `break` but doesn't recognise `return`
+#   as a terminator.
+#
+# WARNING: "Function declarations in blocks" (7)
+#   FALSE POSITIVE — Manual inspection found zero function declarations inside
+#   control-flow blocks. All function declarations are at module scope.
+#   UBS appears to misparse certain TypeScript constructs as block-level
+#   function declarations.
+#
+# WARNING: "Nested ternary operators" (4)
+#   FALSE POSITIVE — The flagged lines are TypeScript type annotations with
+#   optional chaining `?` in constructor parameter types
+#   (e.g. `deps?: { ssh?: SSHManager; remote?: RemoteCommandRunner }`).
+#   These are NOT ternary operators. UBS does not parse TypeScript types.
+#
+# WARNING: "Blocking dialogs" (3)
+#   FALSE POSITIVE — The flagged usages are:
+#   (1) cli/rollback.ts: a readline-based `async function prompt()` wrapper —
+#       NOT window.prompt(). It is asynchronous and Node.js-safe.
+#   (2) cli/index.ts:333: a console.log() call — not a dialog at all.
+#   UBS pattern-matches on the identifier `prompt` regardless of context.
+#
+# WARNING: "Synchronous fs.*Sync calls" (4)
+#   FALSE POSITIVE — These are intentional per the architectural design:
+#   - readFileSync: reads small YAML config files (~1 KB) at startup
+#   - writeFileSync / mkdirSync / chmodSync: one-time config file writes
+#   - The pitch explicitly mandates synchronous SQLite (better-sqlite3)
+#   Blocking I/O is acceptable for a local CLI tool processing tiny config files.
+#
+# INFO: "Explicit any types present" (2 — ssh.ts SSHStreamChannel.on)
+#   FALSE POSITIVE — The two `any[]` annotations are on the `.on()` listener
+#   signatures of an internal `SSHStreamChannel` interface that models the
+#   Node.js EventEmitter pattern. TypeScript's own `EventEmitter.on()` type uses
+#   `any[]` for the same reason: using `unknown[]` breaks contravariance for all
+#   typed callbacks (e.g. `(chunk: Buffer) => void`). The `any` is scoped to a
+#   private interface and annotated with `// eslint-disable-next-line`.
+#
+# INFO: "TypeScript compiler not detected"
+#   FALSE POSITIVE — TypeScript IS installed (see devDependencies in package.json).
+#   UBS is looking for a global `tsc`; we use `npx tsc` via the project's
+#   local devDependency. Run `npm run typecheck` for TypeScript validation.
+# ──────────────────────────────────────────────────────────────────────────────

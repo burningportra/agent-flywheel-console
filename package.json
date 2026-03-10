@@ -8,11 +8,20 @@
   },
   "scripts": {
     "dev": "tsx cli/index.ts",
-    "build": "esbuild cli/index.ts --bundle --platform=node --target=node20 --outfile=dist/cli.js --format=esm --external:better-sqlite3 --external:node-ssh --external:ssh2",
+    "build": "esbuild cli/index.ts --bundle --platform=node --target=node20 --outfile=dist/cli.js --format=esm --packages=external",
     "dashboard": "vite dashboard",
     "build:dashboard": "vite build dashboard",
     "serve": "tsx cli/index.ts serve",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:unit": "vitest run test/unit/**/*.test.ts",
+    "test:integration": "vitest run test/integration/**/*.test.ts",
+    "test:e2e": "FLYWHEEL_TEST_E2E=1 vitest run test/e2e/**/*.e2e.ts --testTimeout 60000",
+    "test:e2e:local": "vitest run test/e2e/local-commands.e2e.ts --testTimeout 30000",
+    "test:surface": "tsx scripts/coverage-surface.ts",
+    "test:surface:strict": "tsx scripts/coverage-surface.ts --strict"
   },
   "engines": {
     "node": ">=20"
@@ -20,6 +29,7 @@
   "license": "MIT",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
+    "@inquirer/prompts": "^8.3.0",
     "better-sqlite3": "^11.0.0",
     "chalk": "^5.3.0",
     "commander": "^12.0.0",
@@ -33,9 +43,11 @@
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.11.0",
     "@types/ws": "^8.5.10",
+    "@vitest/coverage-v8": "^4.0.18",
     "esbuild": "^0.20.0",
     "tsx": "^4.7.0",
     "typescript": "^5.4.0",
-    "vite": "^5.1.0"
+    "vite": "^5.1.0",
+    "vitest": "^4.0.18"
   }
 }

@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Flywheel Dashboard</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <div class="ambient ambient-one"></div>
+    <div class="ambient ambient-two"></div>
+
+    <main class="app-shell">
+      <header class="topbar card">
+        <div class="topbar-copy">
+          <p class="eyebrow">Agent Flywheel Console</p>
+          <h1>Orchestration cockpit</h1>
+          <p class="lede">
+            A local control surface for the full remote coding flywheel: understand run state,
+            steer prompts, and keep human gates explicit.
+          </p>
+        </div>
+
+        <div class="topbar-ops">
+          <div class="panel-label-row">
+            <span class="section-kicker">Control link</span>
+            <span id="ws-status" class="status-pill status-idle">Connecting</span>
+          </div>
+
+          <label class="field compact-field">
+            <span>Server URL</span>
+            <input id="server-url" type="text" value="http://127.0.0.1:4200" />
+          </label>
+
+          <div class="button-row">
+            <button id="reconnect-button" class="button button-primary">Reconnect</button>
+            <button id="refresh-button" class="button">Refresh</button>
+          </div>
+
+          <p id="server-meta" class="microcopy">Waiting for snapshot…</p>
+        </div>
+      </header>
+
+      <section class="hero-grid">
+        <article class="hero-callout card card-accent">
+          <div class="panel-label-row">
+            <span class="section-kicker">Operator guidance</span>
+            <span id="run-badge" class="status-pill status-subtle">No run</span>
+          </div>
+          <h2 id="guidance-title">Loading dashboard context</h2>
+          <p id="guidance-detail" class="lede-small">Waiting for the first snapshot from the local server.</p>
+          <div id="workflow-rail" class="workflow-rail"></div>
+        </article>
+
+        <section class="metrics-grid">
+          <article class="metric-card card">
+            <p class="metric-label">Run</p>
+            <p id="metric-run" class="metric-value">—</p>
+            <p id="metric-project" class="metric-note">Project —</p>
+          </article>
+
+          <article class="metric-card card">
+            <p class="metric-label">Phase</p>
+            <p id="metric-phase" class="metric-value">—</p>
+            <p id="metric-phase-meta" class="metric-note">Gate state unavailable</p>
+          </article>
+
+          <article class="metric-card card">
+            <p class="metric-label">SSH</p>
+            <p id="metric-ssh" class="metric-value">Unknown</p>
+            <p id="metric-host" class="metric-note">Host —</p>
+          </article>
+
+          <article class="metric-card card">
+            <p class="metric-label">Swarm</p>
+            <p id="metric-agents" class="metric-value">0</p>
+            <p id="metric-agent-breakdown" class="metric-note">active 0 · idle 0 · stuck 0</p>
+          </article>
+
+          <article class="metric-card card">
+            <p class="metric-label">Beads</p>
+            <p id="metric-beads" class="metric-value">—</p>
+            <p id="metric-top-pick" class="metric-note">Top pick unavailable</p>
+            <p id="metric-velocity" class="metric-note">Velocity unavailable</p>
+          </article>
+
+          <article class="metric-card card">
+            <p class="metric-label">Prompts</p>
+            <p id="metric-prompts" class="metric-value">0</p>
+            <p id="metric-session" class="metric-note">Session —</p>
+          </article>
+        </section>
+      </section>
+
+      <section id="error-banner" class="error-banner hidden"></section>
+
+      <section class="content-grid">
+        <article class="card tall-card">
+          <div class="panel-header">
+            <div>
+              <p class="section-kicker">Live activity</p>
+              <h3>Agent status</h3>
+            </div>
+            <p id="agents-updated" class="panel-meta">No data yet</p>
+          </div>
+          <div id="agent-list" class="stack"></div>
+        </article>
+
+        <article class="card">
+          <div class="panel-header">
+            <div>
+              <p class="section-kicker">Board pulse</p>
+              <h3>Bead board</h3>
+            </div>
+            <p class="panel-meta">Live remote board summary</p>
+          </div>
+          <div id="bead-summary" class="stack"></div>
+        </article>
+
+        <article class="card">
+          <div class="panel-header">
+            <div>
+              <p class="section-kicker">Capabilities</p>
+              <h3>Action readiness</h3>
+            </div>
+            <p class="panel-meta">What the dashboard can safely do right now</p>
+          </div>
+          <div id="action-availability" class="stack"></div>
+        </article>
+
+        <article class="card">
+          <div class="panel-header">
+            <div>
+              <p class="section-kicker">Prompt library</p>
+              <h3>Available prompts</h3>
+            </div>
+            <p id="prompt-library-meta" class="panel-meta">Loading prompts…</p>
+          </div>
+          <div id="prompt-library" class="chip-grid"></div>
+        </article>
+
+        <article class="card">
+          <div class="panel-header">
+            <div>
+              <p class="section-kicker">Remote health</p>
+              <h3>VPS checks</h3>
+            </div>
+            <p class="panel-meta">Remote shell telemetry</p>
+          </div>
+          <div id="vps-health" class="stack stack-tight"></div>
+        </article>
+
+        <article class="card">
+          <div class="panel-header">
+            <div>
+              <p class="section-kicker">Coordination</p>
+              <h3>Agent Mail</h3>
+            </div>
+            <p class="panel-meta">Mail integration status</p>
+          </div>
+          <div id="mail-status" class="stack"></div>
+        </article>
+      </section>
+
+      <section class="controls-grid">
+        <article class="card span-two">
+          <div class="panel-header">
+            <div>
+              <p class="section-kicker">Prompt injection</p>
+              <h3>Send a named prompt</h3>
+            </div>
+            <p id="prompt-meta" class="panel-meta">Select a prompt to see its routing metadata.</p>
+          </div>
+
+          <form id="prompt-form" class="stack">
+            <div class="two-up">
+              <label class="field">
+                <span>Prompt name</span>
+                <input id="prompt-name" type="text" list="prompt-options" placeholder="fresh-review" required />
+                <datalist id="prompt-options"></datalist>
+              </label>
+
+              <label class="field">
+                <span>Prompt variables</span>
+                <textarea
+                  id="prompt-vars"
+                  rows="4"
+                  placeholder="plan_path=/tmp/plan.md&#10;bead_id=agent-flywheel-console-8dp.2"
+                ></textarea>
+              </label>
+            </div>
+
+            <div class="three-up">
+              <label class="field">
+                <span>Target pane</span>
+                <input id="prompt-pane" type="number" min="1" placeholder="4" />
+              </label>
+
+              <label class="checkbox checkbox-card">
+                <input id="prompt-all" type="checkbox" />
+                <span>Broadcast to every pane in the session</span>
+              </label>
+
+              <div class="inline-summary">
+                <p class="inline-summary-label">Target session</p>
+                <p id="session-summary" class="inline-summary-value">—</p>
+              </div>
+            </div>
+
+            <div class="button-row">
+              <button id="prompt-submit" class="button button-primary" type="submit">Send prompt</button>
+            </div>
+          </form>
+        </article>
+
+        <article class="card">
+          <div class="panel-header">
+            <div>
+              <p class="section-kicker">Swarm controls</p>
+              <h3>Pause or resume</h3>
+            </div>
+            <p class="panel-meta">Use only when the active session really needs intervention</p>
+          </div>
+
+          <div class="stack">
+            <button id="pause-button" class="button button-warn">Pause swarm</button>
+            <button id="resume-button" class="button">Resume swarm</button>
+            <p id="swarm-controls-note" class="microcopy">Waiting for capabilities…</p>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="panel-header">
+            <div>
+              <p class="section-kicker">Human gate</p>
+              <h3>Advance the run</h3>
+            </div>
+            <p class="panel-meta">This mutates local flywheel run state</p>
+          </div>
+
+          <form id="gate-form" class="stack">
+            <label class="field">
+              <span>Next phase</span>
+              <select id="gate-phase">
+                <option value="beads">beads</option>
+                <option value="swarm">swarm</option>
+                <option value="review">review</option>
+                <option value="deploy">deploy</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span>Checkpoint SHA</span>
+              <input id="gate-checkpoint" type="text" placeholder="optional" />
+            </label>
+
+            <button id="gate-submit" class="button button-primary" type="submit">Advance gate</button>
+            <p id="gate-note" class="microcopy">Waiting for run context…</p>
+          </form>
+        </article>
+      </section>
+
+      <section class="card">
+        <div class="panel-header">
+          <div>
+            <p class="section-kicker">Recent responses</p>
+            <h3>Action log</h3>
+          </div>
+          <p class="panel-meta">Latest dashboard events and command outcomes</p>
+        </div>
+        <div id="action-log" class="log"></div>
+      </section>
+    </main>
+
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>
