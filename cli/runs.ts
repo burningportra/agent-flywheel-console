@@ -10,8 +10,12 @@ import { phaseColor, truncate } from "./utils.js";
 /** Returns a plain (un-colored) duration string for column-safe padding. */
 export function durationStr(startedAt: string, completedAt: string | null): string {
   if (!completedAt) return "in progress";
-  const ms =
-    new Date(completedAt).getTime() - new Date(startedAt).getTime();
+  // Guard against negative durations from clock skew or corrupted timestamps:
+  // Math.max(0, ...) ensures we never display "-45s" or similar nonsense.
+  const ms = Math.max(
+    0,
+    new Date(completedAt).getTime() - new Date(startedAt).getTime()
+  );
   const secs = Math.floor(ms / 1000);
   if (secs < 60) return `${secs}s`;
   const mins = Math.floor(secs / 60);

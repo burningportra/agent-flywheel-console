@@ -145,6 +145,12 @@ CREATE TABLE IF NOT EXISTS api_calls (
   cost_usd REAL,
   called_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
+
+-- Indexes on run_id for tables queried per-run. Without these, getTotalCost(),
+-- beadVelocity(), and getBeadSnapshots() do full table scans — acceptable for
+-- small datasets but degrades with many runs / long-running projects.
+CREATE INDEX IF NOT EXISTS idx_api_calls_run_id ON api_calls(run_id);
+CREATE INDEX IF NOT EXISTS idx_bead_snapshots_run_id ON bead_snapshots(run_id, captured_at);
 `;
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
@@ -241,19 +247,25 @@ export class StateManager {
 
   /** Advance the human gate to the next phase and optionally record a checkpoint SHA. */
   advanceGate(runId: string, nextPhase: Phase, checkpointSha?: string): void {
-    // Capture current phase before overwriting it so the event log is complete.
-    const currentRun = this.getFlywheelRun(runId);
-    const previousPhase = currentRun?.phase;
-    this.db
-      .prepare(
-        `UPDATE flywheel_runs SET gate_passed_at = ?, phase = ?, checkpoint_sha = ? WHERE id = ?`
-      )
-      .run(now(), nextPhase, checkpointSha ?? null, runId);
-    this.logEvent(runId, "gate_advanced", { previousPhase, nextPhase, checkpointSha }, {
-      phaseFrom: previousPhase,
-      phaseTo: nextPhase,
-      actor: "human",
-    });
+    // Wrap in a transaction so the UPDATE and the event INSERT are atomic.
+    // Without this, a process crash between the two statements would leave the
+    // flywheel_runs row updated but no corresponding gate_advanced event, making
+    // replay inaccurate and phase from/to fields incorrect.
+    this.db.transaction(() => {
+      // Capture current phase before overwriting it so the event log is complete.
+      const currentRun = this.getFlywheelRun(runId);
+      const previousPhase = currentRun?.phase;
+      this.db
+        .prepare(
+          `UPDATE flywheel_runs SET gate_passed_at = ?, phase = ?, checkpoint_sha = ? WHERE id = ?`
+        )
+        .run(now(), nextPhase, checkpointSha ?? null, runId);
+      this.logEvent(runId, "gate_advanced", { previousPhase, nextPhase, checkpointSha }, {
+        phaseFrom: previousPhase,
+        phaseTo: nextPhase,
+        actor: "human",
+      });
+    })();
   }
 
   completeFlywheelRun(runId: string, costUsd: number, notes?: string): void {
