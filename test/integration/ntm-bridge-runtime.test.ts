@@ -11,7 +11,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SSHManager } from "../../cli/ssh.js";
@@ -22,6 +22,15 @@ import {
   createFakeNtmBin,
   type LoopbackSshServer,
 } from "../helpers/ssh-loopback.js";
+
+function tempBin(script: string): { binDir: string; cleanup: () => void } {
+  const binDir = mkdtempSync(join(tmpdir(), "flywheel-fake-ntm-"));
+  writeFileSync(join(binDir, "ntm"), `#!/bin/sh\n${script}\n`, { mode: 0o755 });
+  return {
+    binDir,
+    cleanup: () => { try { rmSync(binDir, { recursive: true, force: true }); } catch { /* best-effort */ } },
+  };
+}
 
 // ── Shared lifecycle helpers ──────────────────────────────────────────────────
 
@@ -42,10 +51,12 @@ describe("NtmBridge.list() — session listing and JSON parsing", () => {
   let srv: LoopbackSshServer;
   let ssh: SSHManager;
   let ntm: NtmBridge;
+  let cleanupFakeBin: () => void;
 
   beforeEach(async () => {
     const fakeBin = createFakeNtmBin();
-    srv = await startLoopbackSsh({ extraPath: [fakeBin] });
+    cleanupFakeBin = fakeBin.cleanup;
+    srv = await startLoopbackSsh({ extraPath: [fakeBin.binDir] });
     const stack = buildStack(srv);
     ssh = stack.ssh;
     ntm = stack.ntm;
@@ -55,6 +66,7 @@ describe("NtmBridge.list() — session listing and JSON parsing", () => {
   afterEach(async () => {
     ssh.disconnect();
     await srv.stop();
+    cleanupFakeBin();
   });
 
   it("returns an array of NtmSession objects", async () => {
@@ -76,15 +88,8 @@ describe("NtmBridge.list() — session listing and JSON parsing", () => {
   });
 
   it("returns empty array when sessions list is empty", async () => {
-    // Start a new server with a fake ntm that returns empty sessions
-    const emptyBin = mkdtempSync(join(tmpdir(), "flywheel-fake-ntm-empty-"));
-    writeFileSync(
-      join(emptyBin, "ntm"),
-      `#!/bin/sh\necho '{"sessions":[]}'\n`,
-      { mode: 0o755 }
-    );
-
-    const srv2 = await startLoopbackSsh({ extraPath: [emptyBin] });
+    const emptyBin = tempBin(`echo '{"sessions":[]}'`);
+    const srv2 = await startLoopbackSsh({ extraPath: [emptyBin.binDir] });
     const stack2 = buildStack(srv2);
     await stack2.ssh.connect();
 
@@ -94,6 +99,7 @@ describe("NtmBridge.list() — session listing and JSON parsing", () => {
     } finally {
       stack2.ssh.disconnect();
       await srv2.stop();
+      emptyBin.cleanup();
     }
   });
 });
@@ -109,7 +115,7 @@ describe("NtmBridge.activity() — pane status derivation", () => {
       panes: [{ index: 0, title: "work", type: "claude", active: true, command: "claude" }],
     };
     const fakeBin = createFakeNtmBin({ statusJson });
-    const srv = await startLoopbackSsh({ extraPath: [fakeBin] });
+    const srv = await startLoopbackSsh({ extraPath: [fakeBin.binDir] });
     const { ssh, ntm } = buildStack(srv);
     await ssh.connect();
 
@@ -121,6 +127,7 @@ describe("NtmBridge.activity() — pane status derivation", () => {
     } finally {
       ssh.disconnect();
       await srv.stop();
+      fakeBin.cleanup();
     }
   });
 
@@ -135,7 +142,7 @@ describe("NtmBridge.activity() — pane status derivation", () => {
       ],
     };
     const fakeBin = createFakeNtmBin({ statusJson });
-    const srv = await startLoopbackSsh({ extraPath: [fakeBin] });
+    const srv = await startLoopbackSsh({ extraPath: [fakeBin.binDir] });
     const { ssh, ntm } = buildStack(srv);
     await ssh.connect();
 
@@ -148,17 +155,13 @@ describe("NtmBridge.activity() — pane status derivation", () => {
     } finally {
       ssh.disconnect();
       await srv.stop();
+      fakeBin.cleanup();
     }
   });
 
   it("returns empty array when session does not exist", async () => {
-    const noExistBin = mkdtempSync(join(tmpdir(), "flywheel-fake-ntm-noexist-"));
-    writeFileSync(
-      join(noExistBin, "ntm"),
-      `#!/bin/sh\necho '{"exists":false,"session":"s","panes":null}'\n`,
-      { mode: 0o755 }
-    );
-    const srv = await startLoopbackSsh({ extraPath: [noExistBin] });
+    const noExistBin = tempBin(`echo '{"exists":false,"session":"s","panes":null}'`);
+    const srv = await startLoopbackSsh({ extraPath: [noExistBin.binDir] });
     const { ssh, ntm } = buildStack(srv);
     await ssh.connect();
 
@@ -168,6 +171,7 @@ describe("NtmBridge.activity() — pane status derivation", () => {
     } finally {
       ssh.disconnect();
       await srv.stop();
+      noExistBin.cleanup();
     }
   });
 });
@@ -178,10 +182,12 @@ describe("NtmBridge.pause() — interrupt command", () => {
   let srv: LoopbackSshServer;
   let ssh: SSHManager;
   let ntm: NtmBridge;
+  let cleanupFakeBin: () => void;
 
   beforeEach(async () => {
     const fakeBin = createFakeNtmBin();
-    srv = await startLoopbackSsh({ extraPath: [fakeBin] });
+    cleanupFakeBin = fakeBin.cleanup;
+    srv = await startLoopbackSsh({ extraPath: [fakeBin.binDir] });
     const stack = buildStack(srv);
     ssh = stack.ssh;
     ntm = stack.ntm;
@@ -191,6 +197,7 @@ describe("NtmBridge.pause() — interrupt command", () => {
   afterEach(async () => {
     ssh.disconnect();
     await srv.stop();
+    cleanupFakeBin();
   });
 
   it("returns NtmPauseResult with correct session name", async () => {
@@ -204,10 +211,8 @@ describe("NtmBridge.pause() — interrupt command", () => {
 
 describe("NtmBridge.resume() — unsupported guard", () => {
   it("throws NtmBridgeError unconditionally", async () => {
-    // resume() never calls the remote — test it without starting a server
-    const fakeSsh = {} as SSHManager;
-    const fakeRunner = {} as RemoteCommandRunner;
-    const ntm = new NtmBridge(fakeRunner);
+    // resume() never calls the remote — no server needed
+    const ntm = new NtmBridge({} as RemoteCommandRunner);
 
     await expect(ntm.resume("any-session")).rejects.toThrow(NtmBridgeError);
     await expect(ntm.resume("any-session")).rejects.toThrow(/resume/i);
@@ -218,13 +223,8 @@ describe("NtmBridge.resume() — unsupported guard", () => {
 
 describe("NtmBridge — JSON parsing and transport error handling", () => {
   it("throws NtmBridgeError when ntm outputs empty stdout", async () => {
-    const emptyBin = mkdtempSync(join(tmpdir(), "flywheel-fake-ntm-empty2-"));
-    writeFileSync(
-      join(emptyBin, "ntm"),
-      `#!/bin/sh\n# outputs nothing\n`,
-      { mode: 0o755 }
-    );
-    const srv = await startLoopbackSsh({ extraPath: [emptyBin] });
+    const emptyBin = tempBin(`# outputs nothing — no echo`);
+    const srv = await startLoopbackSsh({ extraPath: [emptyBin.binDir] });
     const { ssh, ntm } = buildStack(srv);
     await ssh.connect();
 
@@ -234,17 +234,13 @@ describe("NtmBridge — JSON parsing and transport error handling", () => {
     } finally {
       ssh.disconnect();
       await srv.stop();
+      emptyBin.cleanup();
     }
   });
 
   it("throws NtmBridgeError when ntm outputs malformed JSON", async () => {
-    const badBin = mkdtempSync(join(tmpdir(), "flywheel-fake-ntm-badjson-"));
-    writeFileSync(
-      join(badBin, "ntm"),
-      `#!/bin/sh\necho 'this is not json at all'\n`,
-      { mode: 0o755 }
-    );
-    const srv = await startLoopbackSsh({ extraPath: [badBin] });
+    const badBin = tempBin(`echo 'this is not json at all'`);
+    const srv = await startLoopbackSsh({ extraPath: [badBin.binDir] });
     const { ssh, ntm } = buildStack(srv);
     await ssh.connect();
 
@@ -254,6 +250,7 @@ describe("NtmBridge — JSON parsing and transport error handling", () => {
     } finally {
       ssh.disconnect();
       await srv.stop();
+      badBin.cleanup();
     }
   });
 

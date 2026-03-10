@@ -100,7 +100,6 @@ export async function startLoopbackSsh(
   // Generate client key pair (client authenticates with this)
   const clientKeyPair = sshUtils.generateKeyPairSync("ed25519");
   const clientPrivateKey = clientKeyPair.private;
-  const clientPublicKey = clientKeyPair.public; // "ssh-ed25519 AAAA..." format
 
   // Write client private key to disk — SSHManager reads it via privateKeyPath
   const clientKeyPath = join(tmpBase, "keys", "client_ed25519");
@@ -262,19 +261,27 @@ export async function startLoopbackSsh(
   };
 }
 
+export interface FakeNtmBin {
+  /** Absolute path to the directory containing the fake `ntm` binary */
+  binDir: string;
+  /** Delete the temp directory (call in afterEach or finally) */
+  cleanup: () => void;
+}
+
 /**
  * Create a temp directory containing a fake `ntm` shell script.
  * The script outputs pre-defined JSON responses based on the subcommand,
  * matching the real ntm JSON output shapes that NtmBridge parses.
  *
- * Returns the directory path — pass it as extraPath to startLoopbackSsh().
+ * Returns { binDir, cleanup } — pass binDir as an element of extraPath
+ * to startLoopbackSsh(), and call cleanup() in afterEach or finally.
  */
 export function createFakeNtmBin(opts?: {
   /** Override what `ntm list --json` returns */
   listJson?: object;
   /** Override what `ntm status <session> --json` returns */
   statusJson?: object;
-}): string {
+}): FakeNtmBin {
   const binDir = mkdtempSync(join(tmpdir(), "flywheel-fake-ntm-"));
 
   const listJson = opts?.listJson ?? {
@@ -299,6 +306,13 @@ export function createFakeNtmBin(opts?: {
     ],
   };
 
+  // Serialize the JSON objects once at harness-construction time.
+  // The status JSON is output verbatim — NtmBridge.activity() does not use
+  // the top-level "session" field from the response, so no SESSION substitution
+  // is needed (and attempting it with shell quoting inside JSON is fragile).
+  const listJsonStr = JSON.stringify(listJson);
+  const statusJsonStr = JSON.stringify(statusJson);
+
   const ntmScript = `#!/bin/sh
 # Fake ntm binary for integration testing
 CMD="$1"
@@ -306,15 +320,12 @@ shift
 
 case "$CMD" in
   list)
-    echo '${JSON.stringify(listJson)}'
+    echo '${listJsonStr}'
     ;;
   status)
-    SESSION="$1"
-    echo '${JSON.stringify(statusJson).replace("test-session", '${SESSION}')}'
+    echo '${statusJsonStr}'
     ;;
   spawn)
-    SESSION="$1"
-    shift
     echo '{"ok":true,"pane_count":3}'
     ;;
   send)
@@ -335,5 +346,14 @@ esac
   const ntmPath = join(binDir, "ntm");
   writeFileSync(ntmPath, ntmScript, { mode: 0o755 });
 
-  return binDir;
+  return {
+    binDir,
+    cleanup: () => {
+      try {
+        rmSync(binDir, { recursive: true, force: true });
+      } catch {
+        // best-effort cleanup
+      }
+    },
+  };
 }
