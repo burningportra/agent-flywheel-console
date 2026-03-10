@@ -25,7 +25,9 @@ export default defineConfig({
       "test/e2e/ssh-connectivity.e2e.ts",
       "test/e2e/error-matrix/**/*.e2e.ts",
       "test/e2e/concurrent/**/*.e2e.ts",
-      ...(process.env.FLYWHEEL_TEST_LIVE ? ["test/live/**/*.test.ts"] : []),
+      ...(process.env.FLYWHEEL_TEST_LIVE
+        ? ["test/live/**/*.test.ts", "test/live/**/*.e2e.ts"]
+        : []),
     ],
 
     exclude: [

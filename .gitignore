@@ -28,6 +28,7 @@ wizard-log.jsonl
 # Test artifacts (transcripts from CI/E2E runs)
 # Written by test/e2e/setup.ts when CI=true or FLYWHEEL_TEST_ARTIFACTS=1
 test-artifacts/
+test/live/artifacts/
 
 # Coverage reports
 coverage/
