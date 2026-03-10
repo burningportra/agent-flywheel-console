@@ -9,8 +9,8 @@
   "scripts": {
     "dev": "tsx cli/index.ts",
     "build": "esbuild cli/index.ts --bundle --platform=node --target=node20 --outfile=dist/cli.js --format=esm --external:better-sqlite3 --external:node-ssh --external:ssh2",
-    "dashboard": "vite dashboard",
-    "build:dashboard": "vite build dashboard",
+    "dashboard": "npm --prefix dashboard run dev",
+    "build:dashboard": "npm --prefix dashboard run build",
     "serve": "tsx cli/index.ts serve",
     "typecheck": "tsc --noEmit"
   },
