@@ -60,6 +60,14 @@ export interface CapturedFailedRequest {
   timestamp: string;
 }
 
+export interface CapturedActionRequest {
+  url: string;
+  method: string;
+  body: string;
+  json: unknown;
+  timestamp: string;
+}
+
 // ─── Harness interface ────────────────────────────────────────────────────────
 
 export interface DashboardHarness {
@@ -73,6 +81,8 @@ export interface DashboardHarness {
   consoleLogs: CapturedConsoleMessage[];
   /** All failed (non-2xx) network requests captured since startup */
   failedRequests: CapturedFailedRequest[];
+  /** All POST /action requests captured since startup */
+  actionRequests: CapturedActionRequest[];
   /**
    * Save a screenshot to the test-artifacts directory.
    * @param name  Short label, e.g. "no-runs-state" — becomes filename prefix.
@@ -164,6 +174,7 @@ export async function startDashboardHarness(
 
   const consoleLogs: CapturedConsoleMessage[] = [];
   const failedRequests: CapturedFailedRequest[] = [];
+  const actionRequests: CapturedActionRequest[] = [];
 
   const page: Page = await context.newPage();
   page.setDefaultNavigationTimeout(navTimeout);
@@ -188,6 +199,28 @@ export async function startDashboardHarness(
   });
 
   // Capture failed network requests (non-2xx or network errors)
+  page.on("request", (request: Request) => {
+    if (request.method() !== "POST" || !request.url().endsWith("/action")) {
+      return;
+    }
+
+    const body = request.postData() ?? "";
+    let json: unknown;
+    try {
+      json = body ? JSON.parse(body) : null;
+    } catch {
+      json = undefined;
+    }
+
+    actionRequests.push({
+      url: request.url(),
+      method: request.method(),
+      body,
+      json,
+      timestamp: new Date().toISOString(),
+    });
+  });
+
   page.on("requestfailed", (request: Request) => {
     failedRequests.push({
       url: request.url(),
@@ -314,6 +347,16 @@ export async function startDashboardHarness(
       }
     }
 
+    lines.push("", "── Action Requests ───────────────────────────────────────");
+    if (actionRequests.length === 0) {
+      lines.push("  (none)");
+    } else {
+      for (const req of actionRequests) {
+        lines.push(`  [${req.timestamp}] ${req.method} ${req.url}`);
+        lines.push(`    body: ${req.body || "(empty)"}`);
+      }
+    }
+
     lines.push("");
 
     try {
@@ -329,6 +372,7 @@ export async function startDashboardHarness(
     wsUrl,
     consoleLogs,
     failedRequests,
+    actionRequests,
     screenshot,
     saveLogs,
     teardown,
