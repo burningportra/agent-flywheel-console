@@ -99,6 +99,8 @@ const ui = {
   gateNoteDisabled: requireElement("#gate-note-disabled") as HTMLElement,
   phaseSteps: requireElement("#phase-steps") as HTMLElement,
   phaseIntro: requireElement("#phase-intro") as HTMLElement,
+  projectPickerBtn: document.querySelector("#project-picker-btn") as HTMLButtonElement | null,
+  projectPickerMenu: document.querySelector("#project-picker-menu") as HTMLElement | null,
 };
 
 // ── Prompt constants for phase steps ────────────────────────────────────────
@@ -137,6 +139,7 @@ interface PhaseStep {
   command?: string;
   promptText?: string;
   promptLabel?: string;
+  actionType?: "swarm.spawn" | "deploy.run";
   state: "done" | "current" | "upcoming";
 }
 
@@ -274,7 +277,7 @@ function getPhaseSteps(snapshot: DashboardSnapshot): PhaseStep[] {
         detail: hasAgents
           ? `${agents.length} agent${agents.length === 1 ? "" : "s"} running in NTM (tmux panes on the VPS)`
           : "NTM (Node Tmux Manager) creates terminal panes on your VPS — one per agent. Each agent is a Claude, Codex, or Gemini instance. Start with 4-8 agents; scale up as you see results.",
-        command: "flywheel swarm 6",
+        actionType: "swarm.spawn" as const,
         state: isSent(0) ? "done" : hasAgents ? "done" : "current",
       },
       {
@@ -364,8 +367,8 @@ function getPhaseSteps(snapshot: DashboardSnapshot): PhaseStep[] {
       },
       {
         title: "Deploy",
-        detail: "The CLI will ask you to type DEPLOY <project-name> to confirm — a deliberate step to prevent accidental deploys. This is the final action.",
-        command: "flywheel deploy",
+        detail: "Commits any tracked changes, pushes to origin, then marks the run complete. Type the confirmation string to proceed.",
+        actionType: "deploy.run" as const,
         state: stepState(2, "upcoming"),
       },
     ];
@@ -500,9 +503,58 @@ function renderPhaseSteps(snapshot: DashboardSnapshot): void {
       result.innerHTML = `Delivered to ${sentEntry.panes.join(", ")} · ${formatRelative(sentEntry.deliveredAt)}<br>
     <span class="step-agent-status">${paneStatuses.join(" &nbsp; ")}</span>`;
       body.append(result);
-    } else if ((step.promptText || step.command) && step.state !== "done") {
+    } else if ((step.promptText || step.command || step.actionType) && step.state !== "done") {
       const actions = document.createElement("div");
       actions.className = "phase-step-actions";
+
+      if (step.actionType === "swarm.spawn") {
+        const form = document.createElement("div");
+        form.className = "spawn-form";
+        const label = document.createElement("label");
+        label.textContent = "Agents: ";
+        const input = document.createElement("input");
+        input.type = "number";
+        input.id = "spawn-count";
+        input.value = "6";
+        input.min = "1";
+        input.max = "20";
+        label.append(input);
+        const btn = document.createElement("button");
+        btn.className = "button button-primary";
+        btn.id = "spawn-btn";
+        btn.type = "button";
+        btn.textContent = "Spawn agents";
+        btn.onclick = async () => {
+          const count = Math.max(1, Math.min(20, parseInt(input.value, 10) || 6));
+          btn.disabled = true;
+          btn.classList.add("is-busy");
+          try {
+            const result = await postAction({ type: "swarm.spawn", count });
+            if (result.ok) {
+              logAction(`Spawned ${count} agents`);
+              await fetchSnapshot();
+            } else {
+              logAction(`Failed to spawn: ${result.error ?? "unknown error"}`, true);
+            }
+          } finally {
+            btn.disabled = false;
+            btn.classList.remove("is-busy");
+          }
+        };
+        form.append(label, btn);
+        actions.append(form);
+      } else if (step.actionType === "deploy.run") {
+        const btn = document.createElement("button");
+        btn.className = "button button-warn";
+        btn.type = "button";
+        btn.textContent = "Deploy project";
+        const currentSnapshot = snapshot;
+        btn.onclick = () => {
+          const projectName = currentSnapshot?.run?.projectName ?? "project";
+          openDeployModal(projectName);
+        };
+        actions.append(btn);
+      }
 
       if (step.promptText) {
         // Build agent pills
@@ -582,6 +634,95 @@ function renderPhaseSteps(snapshot: DashboardSnapshot): void {
   ui.phaseSteps.replaceChildren(fragment);
 }
 
+// ── Project picker ───────────────────────────────────────────────────────────
+
+async function fetchRuns(): Promise<void> {
+  const baseUrl = normalizedBaseUrl();
+  try {
+    const response = await fetch(`${baseUrl}/runs`, { cache: "no-store" });
+    if (!response.ok) return;
+    const data = await response.json() as { runs: Array<{ id: string; project_name: string; phase: string; started_at: string }> };
+    renderProjectPickerMenu(data.runs);
+  } catch {
+    // Non-fatal
+  }
+}
+
+function renderProjectPickerMenu(runs: Array<{ id: string; project_name: string; phase: string; started_at: string }>): void {
+  const menu = ui.projectPickerMenu;
+  if (!menu) return;
+  const currentRunId = state.snapshot?.run?.id;
+  const fragment = document.createDocumentFragment();
+
+  if (runs.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "project-picker-empty";
+    empty.textContent = "No runs found.";
+    fragment.append(empty);
+  } else {
+    for (const run of runs) {
+      const item = document.createElement("button");
+      item.className = `project-picker-item${run.id === currentRunId ? " project-picker-item--current" : ""}`;
+      item.type = "button";
+      const name = document.createElement("span");
+      name.className = "project-picker-name";
+      name.textContent = run.project_name;
+      const meta = document.createElement("span");
+      meta.className = "project-picker-meta";
+      meta.textContent = `${run.phase} · ${formatRelative(run.started_at)}`;
+      item.append(name, meta);
+      item.onclick = async () => {
+        closeProjectPicker();
+        const result = await postAction({ type: "project.select", runId: run.id });
+        if (result.ok) {
+          logAction(`Switched to project: ${run.project_name}`);
+          await fetchSnapshot();
+        } else {
+          logAction(`Failed to switch project: ${result.error ?? "unknown error"}`, true);
+        }
+      };
+      fragment.append(item);
+    }
+  }
+  menu.replaceChildren(fragment);
+}
+
+function openProjectPicker(): void {
+  const menu = ui.projectPickerMenu;
+  if (!menu) return;
+  menu.classList.remove("hidden");
+  void fetchRuns();
+}
+
+function closeProjectPicker(): void {
+  ui.projectPickerMenu?.classList.add("hidden");
+}
+
+// ── Deploy modal ─────────────────────────────────────────────────────────────
+
+let deployModalOpen = false;
+let deployExpectedConfirmation = "";
+
+function openDeployModal(projectName: string): void {
+  deployExpectedConfirmation = `DEPLOY ${projectName}`;
+  deployModalOpen = true;
+  const modal = document.getElementById("deploy-modal");
+  const label = document.getElementById("deploy-expected-label");
+  const input = document.getElementById("deploy-confirmation-input") as HTMLInputElement | null;
+  const note = document.getElementById("deploy-modal-note");
+  if (!modal || !label || !input || !note) return;
+  label.textContent = deployExpectedConfirmation;
+  input.value = "";
+  note.textContent = "";
+  modal.classList.remove("hidden");
+  input.focus();
+}
+
+function closeDeployModal(): void {
+  deployModalOpen = false;
+  document.getElementById("deploy-modal")?.classList.add("hidden");
+}
+
 initialize();
 
 function initialize() {
@@ -595,6 +736,7 @@ async function bootstrapInitialState() {
   try {
     await fetchSnapshot();
     await connect();
+    void fetchRuns();
   } catch (error) {
     logAction(`Dashboard bootstrap failed: ${describeError(error)}`, true);
   }
@@ -710,6 +852,68 @@ function bindEvents() {
     ui.promptName.value = target.dataset["promptName"] ?? "";
     updatePromptMeta();
   };
+
+  const pickerBtn = ui.projectPickerBtn;
+  if (pickerBtn) {
+    pickerBtn.onclick = () => {
+      const menu = ui.projectPickerMenu;
+      if (menu?.classList.contains("hidden")) {
+        openProjectPicker();
+      } else {
+        closeProjectPicker();
+      }
+    };
+  }
+
+  // Close picker when clicking outside
+  document.addEventListener("click", (event) => {
+    const menu = ui.projectPickerMenu;
+    const btn = ui.projectPickerBtn;
+    if (!menu || !btn) return;
+    if (!menu.classList.contains("hidden") && !menu.contains(event.target as Node) && !btn.contains(event.target as Node)) {
+      closeProjectPicker();
+    }
+  });
+
+  const deployCancel = document.getElementById("deploy-cancel-btn");
+  const deploySubmit = document.getElementById("deploy-submit-btn");
+  const deployInput = document.getElementById("deploy-confirmation-input") as HTMLInputElement | null;
+  const deployNote = document.getElementById("deploy-modal-note");
+
+  deployCancel?.addEventListener("click", closeDeployModal);
+
+  deploySubmit?.addEventListener("click", async () => {
+    if (!deployInput || !deployNote) return;
+    const confirmation = deployInput.value.trim();
+    if (!confirmation) {
+      deployNote.textContent = "Please type the confirmation string.";
+      return;
+    }
+    const btn = deploySubmit as HTMLButtonElement;
+    btn.disabled = true;
+    btn.classList.add("is-busy");
+    deployNote.textContent = "Deploying…";
+    try {
+      const result = await postAction({ type: "deploy.run", confirmation });
+      if (result.ok) {
+        closeDeployModal();
+        logAction("Deploy completed successfully.");
+        await fetchSnapshot();
+      } else {
+        deployNote.textContent = result.error ?? "Deploy failed.";
+      }
+    } catch (error) {
+      deployNote.textContent = describeError(error);
+    } finally {
+      btn.disabled = false;
+      btn.classList.remove("is-busy");
+    }
+  });
+
+  // Close modal on overlay click
+  document.getElementById("deploy-modal")?.addEventListener("click", (event) => {
+    if (event.target === event.currentTarget) closeDeployModal();
+  });
 }
 
 function hydrateServerUrl() {

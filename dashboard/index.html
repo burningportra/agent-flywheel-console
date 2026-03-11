@@ -18,6 +18,8 @@
           <span class="status-bar-title">Flywheel Console</span>
           <span id="ws-status" class="status-pill status-idle">Connecting</span>
           <span id="run-badge" class="status-pill status-subtle">No run</span>
+          <button id="project-picker-btn" class="project-picker-btn" type="button">⊕ Project</button>
+          <div id="project-picker-menu" class="project-picker-menu hidden"></div>
         </div>
         <div class="status-bar-center">
           <div id="workflow-rail" class="workflow-rail-inline"></div>
@@ -224,6 +226,19 @@
       </details>
 
     </main>
+
+    <div id="deploy-modal" class="modal-overlay hidden">
+      <div class="modal-card">
+        <h3>Deploy project</h3>
+        <p>Type <code id="deploy-expected-label">DEPLOY project-name</code> to confirm:</p>
+        <input id="deploy-confirmation-input" type="text" autocomplete="off" />
+        <div class="button-row">
+          <button id="deploy-cancel-btn" class="button" type="button">Cancel</button>
+          <button id="deploy-submit-btn" class="button button-warn" type="button">Deploy →</button>
+        </div>
+        <p id="deploy-modal-note" class="microcopy"></p>
+      </div>
+    </div>
 
     <script type="module" src="./main.js"></script>
   </body>

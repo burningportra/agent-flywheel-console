@@ -785,6 +785,7 @@ pre,
   align-items: center;
   gap: 0.6rem;
   flex-shrink: 0;
+  position: relative;
 }
 
 .status-bar-title {
@@ -1210,4 +1211,181 @@ details[open] .system-summary::before {
   color: var(--muted);
   font-style: italic;
   margin: 0;
+}
+
+/* ── Project picker ──────────────────────────────────────────── */
+.project-picker-btn {
+  appearance: none;
+  background: rgba(8, 16, 29, 0.72);
+  border: 1px solid rgba(141, 166, 198, 0.3);
+  border-radius: 999px;
+  color: var(--sky);
+  cursor: pointer;
+  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 0.69rem;
+  letter-spacing: 0.1em;
+  padding: 0.24rem 0.65rem;
+  text-transform: uppercase;
+  transition: border-color 130ms ease, background 130ms ease;
+}
+
+.project-picker-btn:hover {
+  background: rgba(128, 216, 255, 0.08);
+  border-color: rgba(128, 216, 255, 0.55);
+}
+
+.project-picker-menu {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  left: 0;
+  z-index: 100;
+  background: var(--bg-card-strong);
+  border: 1px solid var(--line-strong);
+  border-radius: 0.9rem;
+  box-shadow: var(--shadow-lg);
+  min-width: 22rem;
+  padding: 0.5rem;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.project-picker-item {
+  appearance: none;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 0.6rem;
+  color: var(--text);
+  cursor: pointer;
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.6rem 0.75rem;
+  text-align: left;
+  transition: background 120ms ease, border-color 120ms ease;
+  width: 100%;
+}
+
+.project-picker-item:hover {
+  background: rgba(128, 216, 255, 0.07);
+  border-color: rgba(128, 216, 255, 0.25);
+}
+
+.project-picker-item--current {
+  background: rgba(113, 242, 195, 0.08);
+  border-color: rgba(113, 242, 195, 0.3);
+}
+
+.project-picker-name {
+  font-size: 0.92rem;
+  font-weight: 600;
+  font-family: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+}
+
+.project-picker-meta {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.7rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.project-picker-empty {
+  color: var(--muted);
+  font-size: 0.85rem;
+  padding: 0.5rem 0.75rem;
+}
+
+/* ── Spawn form ──────────────────────────────────────────────── */
+.spawn-form {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.spawn-form label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+
+.spawn-form input[type="number"] {
+  width: 4.5rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(141, 166, 198, 0.26);
+  background: rgba(8, 16, 29, 0.85);
+  color: var(--text);
+  padding: 0.3rem 0.5rem;
+  font: inherit;
+  outline: none;
+  transition: border-color 130ms ease;
+}
+
+.spawn-form input[type="number"]:focus {
+  border-color: rgba(128, 216, 255, 0.76);
+}
+
+/* ── Deploy modal ────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(6, 11, 18, 0.72);
+  backdrop-filter: blur(6px);
+}
+
+.modal-overlay.hidden {
+  display: none;
+}
+
+.modal-card {
+  background: var(--bg-card-strong);
+  border: 1px solid var(--line-strong);
+  border-radius: 1.2rem;
+  box-shadow: var(--shadow-lg);
+  display: grid;
+  gap: 1rem;
+  max-width: 28rem;
+  padding: 1.6rem;
+  width: calc(100% - 2rem);
+}
+
+.modal-card h3 {
+  font-size: 1.1rem;
+}
+
+.modal-card p {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.modal-card code {
+  background: rgba(8, 16, 29, 0.85);
+  border: 1px solid rgba(141, 166, 198, 0.2);
+  border-radius: 0.35rem;
+  color: var(--mint);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.85em;
+  padding: 0.1em 0.4em;
+}
+
+.modal-card input[type="text"] {
+  width: 100%;
+  border-radius: 0.76rem;
+  border: 1px solid rgba(141, 166, 198, 0.26);
+  background: rgba(8, 16, 29, 0.85);
+  color: var(--text);
+  padding: 0.72rem 0.8rem;
+  font: inherit;
+  outline: none;
+  transition: border-color 130ms ease, box-shadow 130ms ease;
+}
+
+.modal-card input[type="text"]:focus {
+  border-color: rgba(128, 216, 255, 0.76);
+  box-shadow: 0 0 0 3px rgba(128, 216, 255, 0.14);
 }

@@ -20,7 +20,7 @@ const BEAD_POLL_MS = 20_000;
 const VPS_HEALTH_POLL_MS = 45_000;
 const MAIL_POLL_MS = 10_000;
 
-export type ActionName = "prompt.send" | "swarm.pause" | "swarm.resume" | "gate.advance";
+export type ActionName = "prompt.send" | "swarm.pause" | "swarm.resume" | "gate.advance" | "swarm.spawn" | "deploy.run" | "project.select";
 
 interface FlywheelServerOptions {
   host?: string;
@@ -139,14 +139,17 @@ export type DashboardAction =
       type: "gate.advance";
       nextPhase: Phase;
       checkpointSha?: string;
-    };
+    }
+  | { type: "swarm.spawn"; count: number; sessionName?: string }
+  | { type: "deploy.run"; confirmation: string }
+  | { type: "project.select"; runId: string };
 
 export class FlywheelServer {
   private readonly host: string;
   private readonly port: number;
   private readonly configuredSessionName?: string;
   private readonly configuredRemoteProjectPath?: string;
-  private readonly configuredRunId?: string;
+  private configuredRunId?: string;
   private readonly sshManager: SSHManager;
   private readonly remoteRunner: RemoteCommandRunner;
   private readonly ntmBridge: NtmBridge;
@@ -201,6 +204,9 @@ export class FlywheelServer {
         "swarm.pause",
         ...(this.ntmBridge.supportsResume() ? (["swarm.resume"] as const) : []),
         "gate.advance",
+        "swarm.spawn",
+        "deploy.run",
+        "project.select",
       ],
       actionStates: emptyActionStates(),
     });
@@ -487,6 +493,70 @@ export class FlywheelServer {
         this.stateManager.advanceGate(runId, action.nextPhase, action.checkpointSha);
         return { ok: true, runId, nextPhase: action.nextPhase };
       }
+      case "swarm.spawn": {
+        const run = this.getLatestRun();
+        const session = action.sessionName ?? this.resolveSessionName();
+        const remoteProjectPath = this.resolveRemoteProjectPath();
+        if (!remoteProjectPath) throw new Error("No remote project path — configure SSH first.");
+
+        const shaResult = await this.remoteRunner.runRemote("git rev-parse HEAD", {
+          cwd: remoteProjectPath, silent: true, timeoutMs: 10_000,
+        });
+        const checkpointSha = shaResult.stdout.trim();
+
+        const spawnResult = await this.ntmBridge.spawn(session, action.count, { cc: action.count });
+
+        if (run) {
+          this.stateManager.setCheckpointSha(run.id, checkpointSha);
+          this.stateManager.logEvent(run.id, "swarm_spawned", {
+            session, paneCount: spawnResult.paneCount, checkpointSha,
+          });
+        }
+
+        return { session, paneCount: spawnResult.paneCount, checkpointSha };
+      }
+      case "deploy.run": {
+        const run = this.getLatestRun();
+        if (!run) throw new Error("No active run to deploy.");
+        const expected = `DEPLOY ${run.project_name}`;
+        if (action.confirmation !== expected) {
+          throw new Error(`Type "${expected}" exactly to confirm.`);
+        }
+        const remoteProjectPath = this.resolveRemoteProjectPath();
+        if (!remoteProjectPath) throw new Error("No remote project path.");
+
+        const beforeSha = (await this.remoteRunner.runRemote("git rev-parse HEAD", {
+          cwd: remoteProjectPath, silent: true, timeoutMs: 10_000,
+        })).stdout.trim();
+
+        const dirty = (await this.remoteRunner.runRemote("git status --porcelain", {
+          cwd: remoteProjectPath, silent: true, timeoutMs: 10_000,
+        })).stdout.trim();
+
+        if (dirty) {
+          await this.remoteRunner.runRemote(
+            `git add -u && git commit -m "chore: flywheel deploy — $(date -u +%Y-%m-%dT%H:%M:%SZ)"`,
+            { cwd: remoteProjectPath, timeoutMs: 30_000 }
+          );
+        }
+
+        await this.remoteRunner.runRemote("git push", { cwd: remoteProjectPath, timeoutMs: 60_000 });
+
+        const afterSha = (await this.remoteRunner.runRemote("git rev-parse HEAD", {
+          cwd: remoteProjectPath, silent: true, timeoutMs: 10_000,
+        })).stdout.trim();
+
+        this.stateManager.logEvent(run.id, "deploy_completed", { beforeSha, afterSha, trackedChangesPresent: Boolean(dirty) });
+        this.stateManager.completeFlywheelRun(run.id, 0, "Deployed via dashboard");
+
+        return { beforeSha, afterSha, trackedChangesPresent: Boolean(dirty) };
+      }
+      case "project.select": {
+        const run = this.stateManager.getFlywheelRun(action.runId);
+        if (!run) throw new Error(`Run ${action.runId} not found.`);
+        this.configuredRunId = action.runId;
+        return { runId: action.runId, projectName: run.project_name, phase: run.phase };
+      }
       default:
         return assertNever(action);
     }
@@ -645,6 +715,12 @@ export class FlywheelServer {
       return;
     }
 
+    if (request.method === "GET" && request.url === "/runs") {
+      const runs = this.stateManager.listFlywheelRuns();
+      this.respondJson(response, 200, { runs });
+      return;
+    }
+
     this.respondJson(response, 404, {
       ok: false,
       error: "Not found",
@@ -737,6 +813,18 @@ export class FlywheelServer {
         "gate.advance": {
           enabled: Boolean(runId),
           reason: runId ? undefined : "No local flywheel run is available to advance.",
+        },
+        "swarm.spawn": {
+          enabled: Boolean(this.resolveRemoteProjectPath()) && snapshot.ssh.connected,
+          reason: !snapshot.ssh.connected ? "SSH not connected." : !this.resolveRemoteProjectPath() ? "No remote path." : undefined,
+        },
+        "deploy.run": {
+          enabled: Boolean(this.resolveRunId()) && snapshot.ssh.connected,
+          reason: !this.resolveRunId() ? "No active run." : !snapshot.ssh.connected ? "SSH not connected." : undefined,
+        },
+        "project.select": {
+          enabled: true,
+          reason: undefined,
         },
       },
     };
@@ -882,6 +970,9 @@ function emptyActionStates(): Record<ActionName, ActionState> {
     "swarm.pause": { enabled: false },
     "swarm.resume": { enabled: false },
     "gate.advance": { enabled: false },
+    "swarm.spawn": { enabled: false },
+    "deploy.run": { enabled: false },
+    "project.select": { enabled: false },
   };
 }
 
