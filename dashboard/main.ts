@@ -94,6 +94,7 @@ const ui = {
   noActionHint: requireElement("#no-action-hint") as HTMLElement,
   gateNoteDisabled: requireElement("#gate-note-disabled") as HTMLElement,
   phaseSteps: requireElement("#phase-steps") as HTMLElement,
+  phaseIntro: requireElement("#phase-intro") as HTMLElement,
 };
 
 // ── Prompt constants for phase steps ────────────────────────────────────────
@@ -143,28 +144,91 @@ function getPhaseSteps(snapshot: DashboardSnapshot): PhaseStep[] {
   const hasAgents = agents.length > 0;
 
   if (!snapshot.run) {
+    const sshOk = snapshot.ssh.connected;
     return [
-      { title: "Configure SSH connection", detail: "Point the console at your VPS", command: "flywheel settings ssh", state: "current" },
-      { title: "Start a new project", detail: "Launch the multi-model planning wizard", command: 'flywheel new "your idea"', state: "upcoming" },
+      {
+        title: "Connect to your VPS",
+        detail: sshOk
+          ? `Connected to ${snapshot.ssh.host ?? "your server"} ✓`
+          : "Tell the console where your ACFS server is. You'll need your server IP address, SSH username, and private key path.",
+        command: "flywheel settings ssh",
+        state: sshOk ? "done" : "current",
+      },
+      {
+        title: "Start your first project",
+        detail: "Describe what you want to build. The planning wizard will ask three AI models to plan it in parallel, then synthesize their best ideas.",
+        command: 'flywheel new "describe what you want to build"',
+        state: sshOk ? "current" : "upcoming",
+      },
     ];
   }
 
   if (phase === "plan") {
     return [
-      { title: "Get competing plans from 3 models", detail: "Ask ChatGPT, Claude Opus, and Gemini for plans on your idea — each has different strengths", state: "current" },
-      { title: "Synthesize the best of all worlds", detail: "Paste all three plans back into your primary AI", promptText: P_COMBINE_PLANS, promptLabel: "Copy combine_plans", state: "upcoming" },
-      { title: "Generate top 10 brilliant ideas", detail: "Think of 100, surface the best 10 — repeat 3× for compounding", promptText: P_100_IDEAS, promptLabel: "Copy 100_ideas", state: "upcoming" },
-      { title: "Run the planning wizard", command: 'flywheel new "your idea"', state: "upcoming" },
-      { title: "Advance gate to Beads", detail: gateEnabled ? "Plan looks good — advance when ready" : "Complete planning, then advance", state: gateEnabled ? "current" : "upcoming" },
+      {
+        title: "Ask three AI models to plan your project",
+        detail: "Open ChatGPT (GPT-4o or newer), Claude.ai (Opus), and Google Gemini. Give each one the same description of what you want to build. Don't worry about perfection — you're collecting three different perspectives.",
+        state: "current",
+      },
+      {
+        title: "Synthesize: combine the best of all three plans",
+        detail: "Paste all three plans back into your primary AI with this prompt. It will honestly compare them, take the best ideas from each, and produce a single superior plan.",
+        promptText: P_COMBINE_PLANS,
+        promptLabel: "Copy combine_plans prompt",
+        state: "upcoming",
+      },
+      {
+        title: "Generate brilliant feature ideas",
+        detail: "This prompt forces the AI to think of 100 ideas before picking the best 10 — much better than asking for 10 directly. Run it 2-3 times for compounding results.",
+        promptText: P_100_IDEAS,
+        promptLabel: "Copy 100_ideas prompt",
+        state: "upcoming",
+      },
+      {
+        title: "Run the local planning wizard",
+        detail: "This orchestrates the multi-model planning automatically and saves a plan.md file. Run it after you have your synthesized plan ready.",
+        command: 'flywheel new "your idea"',
+        state: "upcoming",
+      },
+      {
+        title: "Advance to task breakdown (Beads)",
+        detail: gateEnabled
+          ? "Your plan looks good. When you're ready to break it into tasks, advance the gate below."
+          : "Complete the planning steps above, then advance the gate to move to the task breakdown phase.",
+        state: gateEnabled ? "current" : "upcoming",
+      },
     ];
   }
 
   if (phase === "beads") {
     return [
-      { title: "Generate beads from plan", detail: "Create a granular, self-documenting task graph", promptText: P_CREATE_BEADS, promptLabel: "Copy create_beads", state: "current" },
-      { title: "Review and refine beads", detail: "Iterate in plan space — much cheaper than code space", promptText: P_IMPROVE_BEADS, promptLabel: "Copy improve_beads", state: "upcoming" },
-      { title: "Analyze with Beads Viewer", command: "bv --robot-triage", state: "upcoming" },
-      { title: "Advance gate to Swarm", detail: gateEnabled ? "Beads look good — advance when ready" : "Finalize beads, then advance", state: gateEnabled ? "current" : "upcoming" },
+      {
+        title: "Generate tasks (beads) from your plan",
+        detail: "Beads are granular tasks with dependencies — like a smart to-do list. This prompt creates them automatically from your plan, with enough context in each task that an agent can work on it independently without needing to re-read the whole plan.",
+        promptText: P_CREATE_BEADS,
+        promptLabel: "Copy create_beads prompt",
+        state: "current",
+      },
+      {
+        title: "Review and refine the task breakdown",
+        detail: "It's much cheaper to fix issues in task-space than code-space. This prompt reviews every bead for clarity, feasibility, and optimal sequencing — and revises them. Do this before any code is written.",
+        promptText: P_IMPROVE_BEADS,
+        promptLabel: "Copy improve_beads prompt",
+        state: "upcoming",
+      },
+      {
+        title: "Analyze task priorities with Beads Viewer",
+        detail: "bv uses PageRank to score which tasks are most important (blocking the most other tasks). Run this to see your critical path — the sequence of tasks that determines your minimum ship date.",
+        command: "bv --robot-triage",
+        state: "upcoming",
+      },
+      {
+        title: "Advance to the implementation swarm",
+        detail: gateEnabled
+          ? "Task breakdown looks good. When you're ready to start coding, advance the gate."
+          : "Finalize your beads above, then advance the gate to start spawning agents.",
+        state: gateEnabled ? "current" : "upcoming",
+      },
     ];
   }
 
@@ -175,38 +239,50 @@ function getPhaseSteps(snapshot: DashboardSnapshot): PhaseStep[] {
       ? ` · ETA ${beads.etaHours < 1 ? `${Math.round(beads.etaHours * 60)}m` : `${beads.etaHours.toFixed(1)}h`}`
       : "";
 
+    const step3Title = stuck.length > 0
+      ? `${stuck.length} agent${stuck.length === 1 ? "" : "s"} stuck — needs your attention`
+      : beadsDone
+        ? "All tasks complete ✓"
+        : `Agents working${beads ? ` · ${beads.closed}/${beads.total} tasks done${etaPart}` : ""}`;
+
+    const step3Detail = stuck.length > 0
+      ? `Pane${stuck.length === 1 ? "" : "s"} ${stuck.map((a) => a.pane).join(", ")} ${stuck.length === 1 ? "hasn't" : "haven't"} changed recently. Send this prompt to check for messages from other agents and pick the next task — often this unsticks them.`
+      : beadsDone
+        ? "Every task is closed. Review the work, then advance to the review phase."
+        : beads?.topRecommendation
+          ? `Highest priority open task: ${beads.topRecommendation.id} — ${beads.topRecommendation.title}`
+          : "Monitor the agent panel below. If an agent shows as 'stuck', send it the next_bead prompt.";
+
     return [
       {
-        title: "Spawn agents via NTM (tmux)",
-        detail: hasAgents ? `${hasAgents ? agents.length : "?"} agents running` : "No agents detected yet",
+        title: "Spawn AI agents on your VPS",
+        detail: hasAgents
+          ? `${agents.length} agent${agents.length === 1 ? "" : "s"} running in NTM (tmux panes on the VPS)`
+          : "NTM (Node Tmux Manager) creates terminal panes on your VPS — one per agent. Each agent is a Claude, Codex, or Gemini instance. Start with 4-8 agents; scale up as you see results.",
         command: "flywheel swarm 6",
         state: hasAgents ? "done" : "current",
       },
       {
         title: "Initialize each agent",
-        detail: "Paste to each pane — agents will read AGENTS.md, register with Mail, and start beads",
+        detail: hasAgents
+          ? "Agents have read AGENTS.md and registered with Agent Mail"
+          : "Copy this prompt into each agent pane. It tells the agent to read your project docs, register an identity with Agent Mail (so agents can coordinate), and start picking up tasks from your bead list.",
         promptText: P_NEW_AGENT,
         promptLabel: "Copy new_agent prompt",
         state: hasAgents ? "done" : "upcoming",
       },
       {
-        title: stuck.length > 0
-          ? `Unblock ${stuck.length} stuck agent${stuck.length === 1 ? "" : "s"}`
-          : beadsDone
-            ? "All beads closed ✓"
-            : `Monitor progress${beads ? ` · ${beads.closed}/${beads.total} beads${etaPart}` : ""}`,
-        detail: stuck.length > 0
-          ? `Pane${stuck.length === 1 ? "" : "s"} ${stuck.map((a) => a.pane).join(", ")} stuck — send a prompt or check mail`
-          : beads?.topRecommendation
-            ? `Top pick: ${beads.topRecommendation.id} — ${beads.topRecommendation.title}`
-            : undefined,
+        title: step3Title,
+        detail: step3Detail,
         promptText: stuck.length > 0 ? P_CHECK_MAIL : P_NEXT_BEAD,
-        promptLabel: stuck.length > 0 ? "Copy check_mail" : "Copy next_bead",
+        promptLabel: stuck.length > 0 ? "Copy check_mail prompt" : "Copy next_bead prompt",
         state: hasAgents ? "current" : "upcoming",
       },
       {
-        title: "Advance gate to Review",
-        detail: beadsDone ? "All beads closed — advance when ready" : "Available when all beads are closed",
+        title: "Advance to review",
+        detail: beadsDone
+          ? "All tasks are closed. When you're satisfied with the work, advance to the review phase."
+          : "This step becomes available when all tasks (beads) are closed.",
         state: beadsDone && gateEnabled ? "current" : "upcoming",
       },
     ];
@@ -214,23 +290,125 @@ function getPhaseSteps(snapshot: DashboardSnapshot): PhaseStep[] {
 
   if (phase === "review") {
     return [
-      { title: hasAgents ? "Run fresh review" : "Spawn review agents", command: hasAgents ? undefined : "flywheel swarm 3", promptText: hasAgents ? P_FRESH_REVIEW : undefined, promptLabel: hasAgents ? "Copy fresh_review" : undefined, detail: hasAgents ? undefined : "Re-use the swarm or spawn a smaller review crew", state: "current" },
-      { title: "Peer review — other agents' code", promptText: P_PEER_REVIEW, promptLabel: "Copy check_other_agents", state: "upcoming" },
-      { title: "UI/UX scrutiny — Stripe-level polish", promptText: P_SCRUTINIZE_UI, promptLabel: "Copy scrutinize_ui", state: "upcoming" },
-      { title: "UBS bug scan", promptText: P_APPLY_UBS, promptLabel: "Copy apply_ubs", state: "upcoming" },
-      { title: "Advance gate to Deploy", detail: gateEnabled ? "Review complete — advance when satisfied" : "Complete review passes, then advance", state: gateEnabled ? "current" : "upcoming" },
+      {
+        title: hasAgents ? "Fresh review — catch bugs the author missed" : "Spawn agents for review",
+        detail: hasAgents
+          ? "Each agent re-reads the code they just wrote with 'fresh eyes' — a different mental context than when writing. This catches a surprising number of bugs. Send to every agent."
+          : "Spawn a few agents (even 2-3 is enough for review). They'll review the work done in the swarm phase.",
+        command: hasAgents ? undefined : "flywheel swarm 3",
+        promptText: hasAgents ? P_FRESH_REVIEW : undefined,
+        promptLabel: hasAgents ? "Copy fresh_review prompt" : undefined,
+        state: "current",
+      },
+      {
+        title: "Peer review — agents check each other's code",
+        detail: "Each agent reviews code written by the other agents, not their own. Different agents have different blind spots — this cross-review catches issues that fresh review misses.",
+        promptText: P_PEER_REVIEW,
+        promptLabel: "Copy check_other_agents prompt",
+        state: "upcoming",
+      },
+      {
+        title: "UI/UX scrutiny — polish to Stripe-level quality",
+        detail: "Send to your most capable agent (Claude Opus or GPT-4o). It will go through the entire user-facing experience looking for anything that feels off — unclear interactions, visual rough edges, confusing flows.",
+        promptText: P_SCRUTINIZE_UI,
+        promptLabel: "Copy scrutinize_ui prompt",
+        state: "upcoming",
+      },
+      {
+        title: "UBS scan — systematic bug detection",
+        detail: "UBS (Ultimate Bug Scanner) runs a structured sweep across the entire codebase looking for common error patterns, security issues, and edge cases. More thorough than a manual review.",
+        promptText: P_APPLY_UBS,
+        promptLabel: "Copy apply_ubs prompt",
+        state: "upcoming",
+      },
+      {
+        title: "Advance to deploy",
+        detail: gateEnabled
+          ? "Review passes are complete. When you're satisfied with code quality, advance to deploy."
+          : "Run the review passes above, then advance the gate when you're satisfied.",
+        state: gateEnabled ? "current" : "upcoming",
+      },
     ];
   }
 
   if (phase === "deploy") {
     return [
-      { title: "Commit in logical groups", promptText: P_GIT_COMMIT, promptLabel: "Copy git_commit", state: "current" },
-      { title: "Full GitHub flow", detail: "Tag, version bump, release, monitor Actions", promptText: P_GH_FLOW, promptLabel: "Copy gh_flow", state: "upcoming" },
-      { title: "Deploy", detail: "Requires typing DEPLOY <project-name> to confirm", command: "flywheel deploy", state: "upcoming" },
+      {
+        title: "Commit in logical, well-described groups",
+        detail: "Rather than one giant commit, this prompt groups changes by feature or concern and writes detailed commit messages for each group. This makes the git history readable and reversible.",
+        promptText: P_GIT_COMMIT,
+        promptLabel: "Copy git_commit prompt",
+        state: "current",
+      },
+      {
+        title: "Run the full GitHub deployment flow",
+        detail: "Creates a version tag, bumps the version number, drafts a release, monitors GitHub Actions, and computes checksums. One prompt handles the whole release pipeline.",
+        promptText: P_GH_FLOW,
+        promptLabel: "Copy gh_flow prompt",
+        state: "upcoming",
+      },
+      {
+        title: "Deploy",
+        detail: "The CLI will ask you to type DEPLOY <project-name> to confirm — a deliberate step to prevent accidental deploys. This is the final action.",
+        command: "flywheel deploy",
+        state: "upcoming",
+      },
     ];
   }
 
   return [];
+}
+
+function renderPhaseIntro(snapshot: DashboardSnapshot): void {
+  const phase = snapshot.run?.phase;
+  const fragment = document.createDocumentFragment();
+
+  const eyebrow = document.createElement("p");
+  eyebrow.className = "phase-intro-eyebrow";
+
+  const heading = document.createElement("h2");
+  heading.className = "phase-intro-heading";
+
+  const body = document.createElement("p");
+  body.className = "phase-intro-body";
+
+  if (!snapshot.run) {
+    eyebrow.textContent = "Getting started";
+    heading.textContent = "Welcome to Flywheel Console";
+    body.textContent = "This dashboard orchestrates AI coding agents on your remote VPS. Agents pick up tasks, write code, and coordinate automatically — you supervise and steer. Let's get connected first.";
+  } else if (phase === "plan") {
+    eyebrow.textContent = "Phase 1 of 5 · Planning";
+    heading.textContent = "Build a better plan than any single AI can";
+    body.textContent = "Before writing any code, you'll ask three AI models to plan your project independently. Each model thinks differently and catches different things. Then you synthesize their best ideas into one superior plan.";
+  } else if (phase === "beads") {
+    eyebrow.textContent = "Phase 2 of 5 · Task breakdown";
+    heading.textContent = "Break your plan into work agents can pick up";
+    body.textContent = "Beads are granular tasks with explicit dependencies — like a smart to-do list that agents can claim, work on, and complete independently. A good bead set lets multiple agents work in parallel without stepping on each other.";
+  } else if (phase === "swarm") {
+    const agentCount = snapshot.agents.length;
+    eyebrow.textContent = "Phase 3 of 5 · Implementation";
+    heading.textContent = agentCount > 0
+      ? `${agentCount} agent${agentCount === 1 ? "" : "s"} building your project`
+      : "Ready to launch your AI agent swarm";
+    body.textContent = agentCount > 0
+      ? "Each agent reads your AGENTS.md, picks up the next available bead, and works on it. They coordinate through Agent Mail so they don't overwrite each other. Your job is to monitor progress and unblock stuck agents."
+      : "You'll spawn multiple AI agents via NTM (a tmux session manager). Each agent runs in its own terminal pane on the VPS, claims tasks from your bead list, and reports progress through Agent Mail.";
+  } else if (phase === "review") {
+    eyebrow.textContent = "Phase 4 of 5 · Review";
+    heading.textContent = "Agents review and polish each other's work";
+    body.textContent = "Send structured review prompts to your agents. Fresh review catches bugs the author missed. Peer review catches issues across the whole codebase. UBS (Ultimate Bug Scanner) does a systematic sweep. Each pass makes the code significantly better.";
+  } else if (phase === "deploy") {
+    eyebrow.textContent = "Phase 5 of 5 · Deploy";
+    heading.textContent = "Ship it";
+    body.textContent = "Commit the work in logical groups with detailed messages, run the full GitHub deployment flow, then deploy. The CLI requires you to type DEPLOY <project-name> explicitly — a deliberate confirmation step before anything goes live.";
+  } else {
+    eyebrow.textContent = "Active run";
+    heading.textContent = `Phase: ${phase ?? "unknown"}`;
+    body.textContent = "Dashboard is live. Use the steps below to steer the current run.";
+  }
+
+  fragment.append(eyebrow, heading, body);
+  ui.phaseIntro.replaceChildren(fragment);
 }
 
 function renderPhaseSteps(snapshot: DashboardSnapshot): void {
@@ -647,6 +825,7 @@ function applySnapshot(snapshot: DashboardSnapshot) {
   ui.metricPrompts.textContent = String(snapshot.prompts.length);
   ui.metricSession.textContent = `Session ${snapshot.server.sessionName}`;
   renderMemoryPanel(snapshot);
+  renderPhaseIntro(snapshot);
   renderPhaseSteps(snapshot);
   renderBeadProgress(snapshot.beads, snapshot.run?.phase);
 
