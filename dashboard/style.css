@@ -907,3 +907,20 @@ details[open] .system-summary::before {
     grid-template-columns: 1fr;
   }
 }
+
+.guide-link {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--sky);
+  text-decoration: none;
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.4rem;
+  border: 1px solid rgba(128, 216, 255, 0.3);
+  transition: background 130ms ease, border-color 130ms ease;
+}
+.guide-link:hover {
+  background: rgba(128, 216, 255, 0.08);
+  border-color: rgba(128, 216, 255, 0.55);
+}

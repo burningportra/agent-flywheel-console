@@ -1,0 +1,1107 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Flywheel — Workflow Guide</title>
+    <link rel="stylesheet" href="./style.css" />
+    <link rel="stylesheet" href="./guide.css" />
+  </head>
+  <body>
+    <div class="ambient ambient-one"></div>
+    <div class="ambient ambient-two"></div>
+
+    <header class="guide-header">
+      <div class="guide-header-inner">
+        <a href="/" class="guide-back">← Cockpit</a>
+        <h1>The Agentic Workflow</h1>
+        <p>Plan → Beads → Swarm → Review → Deploy</p>
+      </div>
+    </header>
+
+    <main class="guide-shell">
+
+      <!-- Overview -->
+      <div class="guide-overview">
+        <h2>The Complete Development Lifecycle</h2>
+        <p style="color:var(--muted);font-size:.88rem;line-height:1.55">
+          A full development lifecycle encompassing ideation, planning, task breakdown, implementation, review,
+          testing, deployment, and ongoing maintenance. Agents communicate via Agent Mail, manage tasks through
+          a dependency-aware graph (Beads), and form a self-reinforcing ecosystem.
+        </p>
+        <div class="guide-phase-chips">
+          <a class="guide-phase-chip" href="#phase-1">1 · Ideation</a>
+          <a class="guide-phase-chip" href="#phase-2">2 · Beads</a>
+          <a class="guide-phase-chip" href="#phase-3">3 · Swarm</a>
+          <a class="guide-phase-chip" href="#phase-4">4 · Review</a>
+          <a class="guide-phase-chip" href="#phase-5">5 · Deploy</a>
+          <a class="guide-phase-chip" href="#autopilot">Autopilot</a>
+          <a class="guide-phase-chip" href="#prompts">Prompt Library</a>
+        </div>
+      </div>
+
+      <!-- Phase 1: Ideation -->
+      <div class="guide-phase" id="phase-1">
+        <details open>
+          <summary>
+            <div class="guide-phase-icon" style="background:linear-gradient(135deg,#f59e0b,#ea580c)">1</div>
+            <div class="guide-phase-meta">
+              <div class="guide-phase-title">Phase 1: Ideation &amp; Planning</div>
+              <div class="guide-phase-desc">Produce a comprehensive plan before any code is written</div>
+            </div>
+            <span class="guide-phase-chevron">▼</span>
+          </summary>
+          <div class="guide-phase-body">
+            <div class="guide-tip">
+              <strong>Key principle:</strong> "It's a lot easier and faster to operate in 'plan space' before we start implementing."
+              This phase takes ~1–2 hours. Output: a revised markdown plan (often 5,000+ lines).
+            </div>
+
+            <div class="guide-steps">
+              <div class="guide-step">
+                <div class="guide-step-track">
+                  <div class="guide-step-num" style="background:#f59e0b">1</div>
+                  <div class="guide-step-line"></div>
+                </div>
+                <div class="guide-step-content">
+                  <h4>Describe your project to your primary AI</h4>
+                  <p>Open ChatGPT (GPT-5.2 Pro), Claude Opus 4.5, or Gemini with Deep Think. Describe your project in detail — user experience, technical requirements, what you want to build. Ask it to create a comprehensive implementation plan.</p>
+                </div>
+              </div>
+
+              <div class="guide-step">
+                <div class="guide-step-track">
+                  <div class="guide-step-num" style="background:#f59e0b">2</div>
+                  <div class="guide-step-line"></div>
+                </div>
+                <div class="guide-step-content">
+                  <h4>Get competing plans from two other models</h4>
+                  <p>Give the same prompt to two other models. Each has different strengths:</p>
+                  <ul>
+                    <li>GPT-5.2 Pro — system design and architecture</li>
+                    <li>Claude Opus 4.5 — code quality and correctness</li>
+                    <li>Gemini 3 with Deep Think — creative features and UX</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div class="guide-step">
+                <div class="guide-step-track">
+                  <div class="guide-step-num" style="background:#f59e0b">3</div>
+                  <div class="guide-step-line"></div>
+                </div>
+                <div class="guide-step-content">
+                  <h4>Synthesize the best of all worlds</h4>
+                  <p>Paste all competing plans back into your primary AI with this prompt. Do 2–3 passes — it finds small oversights each time.</p>
+                  <div class="guide-prompt-block">
+                    <div class="guide-prompt-header">
+                      <span class="guide-prompt-label">prompt · combine_plans</span>
+                      <button class="guide-copy-btn" data-copy="I asked 3 competing LLMs to do the exact same thing and they came up with pretty different plans which you can read below. I want you to REALLY carefully analyze their plans with an open mind and be intellectually honest about what they did that's better than your plan. Then I want you to come up with the best possible revisions to your plan (you should simply update your existing document for your original plan with the revisions) that artfully and skillfully blends the &quot;best of all worlds&quot; to create a true, ultimate, superior hybrid version of the plan that best achieves our stated goals and will work the best in real-world practice to solve the problems we are facing and our overarching goals while ensuring the extreme success of the enterprise as best as possible; you should provide me with a complete series of git-diff style changes to your original plan to turn it into the new, enhanced, much longer and detailed plan that integrates the best of all the plans with every good idea included (you don't need to mention which ideas came from which models in the final revised enhanced plan):">Copy</button>
+                    </div>
+                    <pre class="guide-prompt-text">I asked 3 competing LLMs to do the exact same thing and they came up with pretty different plans which you can read below. I want you to REALLY carefully analyze their plans with an open mind and be intellectually honest about what they did that's better than your plan. Then I want you to come up with the best possible revisions to your plan (you should simply update your existing document for your original plan with the revisions) that artfully and skillfully blends the "best of all worlds" to create a true, ultimate, superior hybrid version of the plan that best achieves our stated goals and will work the best in real-world practice to solve the problems we are facing and our overarching goals while ensuring the extreme success of the enterprise as best as possible; you should provide me with a complete series of git-diff style changes to your original plan to turn it into the new, enhanced, much longer and detailed plan that integrates the best of all the plans with every good idea included (you don't need to mention which ideas came from which models in the final revised enhanced plan):</pre>
+                  </div>
+                </div>
+              </div>
+
+              <div class="guide-step">
+                <div class="guide-step-track">
+                  <div class="guide-step-num" style="background:#f59e0b">4</div>
+                </div>
+                <div class="guide-step-content">
+                  <h4>Generate brilliant ideas (100 → top 10)</h4>
+                  <p>Run this 3+ times. The best ideas compound across passes.</p>
+                  <div class="guide-prompt-block">
+                    <div class="guide-prompt-header">
+                      <span class="guide-prompt-label">prompt · 100_ideas</span>
+                      <button class="guide-copy-btn" data-copy="OK so now I want you to come up with your top 10 most brilliant ideas for adding extremely powerful and cool functionality that will make this system far more compelling, useful, intuitive, versatile, powerful, robust, reliable, etc for the users. Use /effort max. But be pragmatic and don't think of features that will be extremely hard to implement or which aren't necessarily worth the additional complexity burden they would introduce. But I don't want you to just think of 10 ideas: I want you to seriously think hard and come up with one HUNDRED ideas and then only tell me your 10 VERY BEST and most brilliant, clever, and radically innovative and powerful ideas.">Copy</button>
+                    </div>
+                    <pre class="guide-prompt-text">OK so now I want you to come up with your top 10 most brilliant ideas for adding extremely powerful and cool functionality that will make this system far more compelling, useful, intuitive, versatile, powerful, robust, reliable, etc for the users. Use /effort max. But be pragmatic and don't think of features that will be extremely hard to implement or which aren't necessarily worth the additional complexity burden they would introduce. But I don't want you to just think of 10 ideas: I want you to seriously think hard and come up with one HUNDRED ideas and then only tell me your 10 VERY BEST and most brilliant, clever, and radically innovative and powerful ideas.</pre>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="guide-tip">
+              <strong>Then run:</strong> <code class="guide-cmd">flywheel new "your idea"</code> to start the local planning wizard — multi-model fan-out with synthesis happens automatically. Advance the gate to Beads when plan.md looks good.
+            </div>
+          </div>
+        </details>
+      </div>
+
+      <!-- Phase 2: Beads -->
+      <div class="guide-phase" id="phase-2">
+        <details>
+          <summary>
+            <div class="guide-phase-icon" style="background:linear-gradient(135deg,#10b981,#0d9488)">2</div>
+            <div class="guide-phase-meta">
+              <div class="guide-phase-title">Phase 2: Task Breakdown (Beads)</div>
+              <div class="guide-phase-desc">Convert the plan into a dependency-aware task graph</div>
+            </div>
+            <span class="guide-phase-chevron">▼</span>
+          </summary>
+          <div class="guide-phase-body">
+            <p style="color:var(--muted);font-size:.88rem;line-height:1.55;margin-bottom:.75rem">
+              Beads are granular tasks with explicit dependencies. Real examples: CASS project = 347 beads, SLB = 76 beads (14 epics, 62 tasks).
+            </p>
+
+            <div class="guide-steps">
+              <div class="guide-step">
+                <div class="guide-step-track">
+                  <div class="guide-step-num" style="background:#10b981">1</div>
+                  <div class="guide-step-line"></div>
+                </div>
+                <div class="guide-step-content">
+                  <h4>Create your project NTM session</h4>
+                  <code class="guide-cmd">ntm new myproject</code>
+                </div>
+              </div>
+
+              <div class="guide-step">
+                <div class="guide-step-track">
+                  <div class="guide-step-num" style="background:#10b981">2</div>
+                  <div class="guide-step-line"></div>
+                </div>
+                <div class="guide-step-content">
+                  <h4>Generate beads from your plan</h4>
+                  <p>In Claude Code with Opus 4.5, paste your final plan and send:</p>
+                  <div class="guide-prompt-block">
+                    <div class="guide-prompt-header">
+                      <span class="guide-prompt-label">prompt · create_beads</span>
+                      <button class="guide-copy-btn" data-copy="OK so please take ALL of that and elaborate on it more and then create a comprehensive and granular set of beads for all this with tasks, subtasks, and dependency structure overlaid, with detailed comments so that the whole thing is totally self-contained and self-documenting (including relevant background, reasoning/justification, considerations, etc.-- anything we'd want our &quot;future self&quot; to know about the goals and intentions and thought process and how it serves the over-arching goals of the project.) Use the `br` tool repeatedly to create the actual beads. Use /effort max.">Copy</button>
+                    </div>
+                    <pre class="guide-prompt-text">OK so please take ALL of that and elaborate on it more and then create a comprehensive and granular set of beads for all this with tasks, subtasks, and dependency structure overlaid, with detailed comments so that the whole thing is totally self-contained and self-documenting (including relevant background, reasoning/justification, considerations, etc.-- anything we'd want our "future self" to know about the goals and intentions and thought process and how it serves the over-arching goals of the project.) Use the `br` tool repeatedly to create the actual beads. Use /effort max.</pre>
+                  </div>
+                </div>
+              </div>
+
+              <div class="guide-step">
+                <div class="guide-step-track">
+                  <div class="guide-step-num" style="background:#10b981">3</div>
+                  <div class="guide-step-line"></div>
+                </div>
+                <div class="guide-step-content">
+                  <h4>Review and refine beads in "plan space"</h4>
+                  <div class="guide-prompt-block">
+                    <div class="guide-prompt-header">
+                      <span class="guide-prompt-label">prompt · improve_beads</span>
+                      <button class="guide-copy-btn" data-copy="Check over each bead super carefully-- are you sure it makes sense? Is it optimal? Could we change anything to make the system work better for users? If so, revise the beads. It's a lot easier and faster to operate in &quot;plan space&quot; before we start implementing these things! Use /effort max.">Copy</button>
+                    </div>
+                    <pre class="guide-prompt-text">Check over each bead super carefully-- are you sure it makes sense? Is it optimal? Could we change anything to make the system work better for users? If so, revise the beads. It's a lot easier and faster to operate in "plan space" before we start implementing these things! Use /effort max.</pre>
+                  </div>
+                </div>
+              </div>
+
+              <div class="guide-step">
+                <div class="guide-step-track">
+                  <div class="guide-step-num" style="background:#10b981">4</div>
+                </div>
+                <div class="guide-step-content">
+                  <h4>Analyze and visualize with Beads Viewer</h4>
+                  <div class="guide-cmd-grid">
+                    <div class="guide-cmd-card"><code>bv --robot-triage</code><p>Deterministic triage (recommended)</p></div>
+                    <div class="guide-cmd-card"><code>br ready</code><p>Show beads ready to work on</p></div>
+                    <div class="guide-cmd-card"><code>br stats</code><p>Project statistics overview</p></div>
+                    <div class="guide-cmd-card"><code>br blocked</code><p>Show blocked issues</p></div>
+                    <div class="guide-cmd-card"><code>bv --robot-insights</code><p>PageRank + critical path</p></div>
+                    <div class="guide-cmd-card"><code>bv --robot-plan</code><p>Parallel tracks, unblocks</p></div>
+                  </div>
+                  <p style="margin-top:.6rem">Then advance gate: <code class="guide-cmd">flywheel gate advance --next swarm</code></p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </details>
+      </div>
+
+      <!-- Phase 3: Swarm -->
+      <div class="guide-phase" id="phase-3">
+        <details>
+          <summary>
+            <div class="guide-phase-icon" style="background:linear-gradient(135deg,#8b5cf6,#7c3aed)">3</div>
+            <div class="guide-phase-meta">
+              <div class="guide-phase-title">Phase 3: Agent Swarm Implementation</div>
+              <div class="guide-phase-desc">Multiple agents working in parallel via NTM + Agent Mail</div>
+            </div>
+            <span class="guide-phase-chevron">▼</span>
+          </summary>
+          <div class="guide-phase-body">
+            <div class="guide-tip">
+              Real example: CASS project produced ~11k LOC in 5 hours, 204 commits, 151 tests passing.
+            </div>
+
+            <div class="guide-steps">
+              <div class="guide-step">
+                <div class="guide-step-track">
+                  <div class="guide-step-num" style="background:#8b5cf6">1</div>
+                  <div class="guide-step-line"></div>
+                </div>
+                <div class="guide-step-content">
+                  <h4>Spawn agent sessions via NTM</h4>
+                  <code class="guide-cmd">flywheel swarm 6</code>
+                  <p style="margin-top:.4rem">Or directly: <code class="guide-cmd">ntm spawn myproject 8</code></p>
+                  <p>Run 3+ machines with multiple subscriptions: 5 Claude Max + 5 ChatGPT Pro + 3 Gemini Advanced. Scale as you see ROI.</p>
+                </div>
+              </div>
+
+              <div class="guide-step">
+                <div class="guide-step-track">
+                  <div class="guide-step-num" style="background:#8b5cf6">2</div>
+                  <div class="guide-step-line"></div>
+                </div>
+                <div class="guide-step-content">
+                  <h4>Initialize each agent</h4>
+                  <p>Copy this to each agent pane to start them working:</p>
+                  <div class="guide-prompt-block">
+                    <div class="guide-prompt-header">
+                      <span class="guide-prompt-label">prompt · new_agent</span>
+                      <button class="guide-copy-btn" data-copy="First read ALL of the AGENTS.md file and README.md file super carefully and understand ALL of both! Then use your code investigation agent mode to fully understand the code, and technical architecture and purpose of the project. Then register with MCP Agent Mail and introduce yourself to the other agents. Be sure to check your agent mail and to promptly respond if needed to any messages; then proceed meticulously with your next assigned beads, working on the tasks systematically and meticulously and tracking your progress via beads and agent mail messages. Don't get stuck in &quot;communication purgatory&quot; where nothing is getting done; be proactive about starting tasks that need to be done, but inform your fellow agents via messages when you do so and mark beads appropriately. When you're not sure what to do next, use the bv tool mentioned in AGENTS.md to prioritize the best beads to work on next; pick the next one that you can usefully work on and get started. Make sure to acknowledge all communication requests from other agents and that you are aware of all active agents and their names. Use /effort max.">Copy</button>
+                    </div>
+                    <pre class="guide-prompt-text">First read ALL of the AGENTS.md file and README.md file super carefully and understand ALL of both! Then use your code investigation agent mode to fully understand the code, and technical architecture and purpose of the project. Then register with MCP Agent Mail and introduce yourself to the other agents. Be sure to check your agent mail and to promptly respond if needed to any messages; then proceed meticulously with your next assigned beads, working on the tasks systematically and meticulously and tracking your progress via beads and agent mail messages. Don't get stuck in "communication purgatory" where nothing is getting done; be proactive about starting tasks that need to be done, but inform your fellow agents via messages when you do so and mark beads appropriately. When you're not sure what to do next, use the bv tool mentioned in AGENTS.md to prioritize the best beads to work on next; pick the next one that you can usefully work on and get started. Make sure to acknowledge all communication requests from other agents and that you are aware of all active agents and their names. Use /effort max.</pre>
+                  </div>
+                </div>
+              </div>
+
+              <div class="guide-step">
+                <div class="guide-step-track">
+                  <div class="guide-step-num" style="background:#8b5cf6">3</div>
+                  <div class="guide-step-line"></div>
+                </div>
+                <div class="guide-step-content">
+                  <h4>Agents self-coordinate via Beads + Agent Mail</h4>
+                  <div class="guide-cmd-grid">
+                    <div class="guide-cmd-card"><code>br update ID --status=in_progress</code><p>Claim a bead before working</p></div>
+                    <div class="guide-cmd-card"><code>br close ID</code><p>Mark a bead complete</p></div>
+                    <div class="guide-cmd-card"><code>file_reservation_paths</code><p>Reserve files to avoid conflicts</p></div>
+                    <div class="guide-cmd-card"><code>send_message / fetch_inbox</code><p>Agent Mail communication</p></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="guide-step">
+                <div class="guide-step-track">
+                  <div class="guide-step-num" style="background:#8b5cf6">4</div>
+                </div>
+                <div class="guide-step-content">
+                  <h4>Safety: DCG + SLB</h4>
+                  <p>DCG blocks destructive commands before they run. SLB handles the "two-person rule" for high-risk operations, requiring quorum approvals via Agent Mail.</p>
+                  <code class="guide-cmd">dcg doctor</code> — verify the pre-commit hook is installed
+                </div>
+              </div>
+            </div>
+
+            <div class="guide-caution">
+              <strong>Avoid "communication purgatory"!</strong> Agents should be proactive about claiming and completing tasks. If stuck waiting, move to other available beads. Continuous progress, not perfect coordination.
+            </div>
+          </div>
+        </details>
+      </div>
+
+      <!-- Phase 4: Review -->
+      <div class="guide-phase" id="phase-4">
+        <details>
+          <summary>
+            <div class="guide-phase-icon" style="background:linear-gradient(135deg,#06b6d4,#0284c7)">4</div>
+            <div class="guide-phase-meta">
+              <div class="guide-phase-title">Phase 4: Review, Testing &amp; Polish</div>
+              <div class="guide-phase-desc">Fresh reviews, peer reviews, UBS scan, UI polish, full tests</div>
+            </div>
+            <span class="guide-phase-chevron">▼</span>
+          </summary>
+          <div class="guide-phase-body">
+            <div class="guide-steps">
+              <div class="guide-step">
+                <div class="guide-step-track">
+                  <div class="guide-step-num" style="background:#06b6d4">1</div>
+                  <div class="guide-step-line"></div>
+                </div>
+                <div class="guide-step-content">
+                  <h4>Fresh self-review</h4>
+                  <div class="guide-prompt-block">
+                    <div class="guide-prompt-header">
+                      <span class="guide-prompt-label">prompt · fresh_review</span>
+                      <button class="guide-copy-btn" data-copy="Great, now I want you to carefully read over all of the new code you just wrote and other existing code you just modified with &quot;fresh eyes&quot; looking super carefully for any obvious bugs, errors, problems, issues, confusion, etc. Carefully fix anything you uncover.">Copy</button>
+                    </div>
+                    <pre class="guide-prompt-text">Great, now I want you to carefully read over all of the new code you just wrote and other existing code you just modified with "fresh eyes" looking super carefully for any obvious bugs, errors, problems, issues, confusion, etc. Carefully fix anything you uncover.</pre>
+                  </div>
+                </div>
+              </div>
+
+              <div class="guide-step">
+                <div class="guide-step-track">
+                  <div class="guide-step-num" style="background:#06b6d4">2</div>
+                  <div class="guide-step-line"></div>
+                </div>
+                <div class="guide-step-content">
+                  <h4>Peer review other agents' code</h4>
+                  <div class="guide-prompt-block">
+                    <div class="guide-prompt-header">
+                      <span class="guide-prompt-label">prompt · check_other_agents</span>
+                      <button class="guide-copy-btn" data-copy="Ok can you now turn your attention to reviewing the code written by your fellow agents and checking for any issues, bugs, errors, problems, inefficiencies, security problems, reliability issues, etc. and carefully diagnose their underlying root causes using first-principle analysis and then fix or revise them if necessary? Don't restrict yourself to the latest commits, cast a wider net and go super deep! Use /effort max.">Copy</button>
+                    </div>
+                    <pre class="guide-prompt-text">Ok can you now turn your attention to reviewing the code written by your fellow agents and checking for any issues, bugs, errors, problems, inefficiencies, security problems, reliability issues, etc. and carefully diagnose their underlying root causes using first-principle analysis and then fix or revise them if necessary? Don't restrict yourself to the latest commits, cast a wider net and go super deep! Use /effort max.</pre>
+                  </div>
+                </div>
+              </div>
+
+              <div class="guide-step">
+                <div class="guide-step-track">
+                  <div class="guide-step-num" style="background:#06b6d4">3</div>
+                  <div class="guide-step-line"></div>
+                </div>
+                <div class="guide-step-content">
+                  <h4>UI/UX scrutiny — Stripe-level polish</h4>
+                  <div class="guide-prompt-block">
+                    <div class="guide-prompt-header">
+                      <span class="guide-prompt-label">prompt · scrutinize_ui</span>
+                      <button class="guide-copy-btn" data-copy="Great, now I want you to super carefully scrutinize every aspect of the application workflow and implementation and look for things that just seem sub-optimal or even wrong/mistaken to you, things that could very obviously be improved from a user-friendliness and intuitiveness standpoint, places where our UI/UX could be improved and polished to be slicker, more visually appealing, and more premium feeling and just ultra high quality, like Stripe-level apps.">Copy</button>
+                    </div>
+                    <pre class="guide-prompt-text">Great, now I want you to super carefully scrutinize every aspect of the application workflow and implementation and look for things that just seem sub-optimal or even wrong/mistaken to you, things that could very obviously be improved from a user-friendliness and intuitiveness standpoint, places where our UI/UX could be improved and polished to be slicker, more visually appealing, and more premium feeling and just ultra high quality, like Stripe-level apps.</pre>
+                  </div>
+                </div>
+              </div>
+
+              <div class="guide-step">
+                <div class="guide-step-track">
+                  <div class="guide-step-num" style="background:#06b6d4">4</div>
+                  <div class="guide-step-line"></div>
+                </div>
+                <div class="guide-step-content">
+                  <h4>Bug scan with UBS</h4>
+                  <div class="guide-prompt-block">
+                    <div class="guide-prompt-header">
+                      <span class="guide-prompt-label">prompt · apply_ubs</span>
+                      <button class="guide-copy-btn" data-copy="Read about the ubs tool in AGENTS.md. Now run UBS and investigate and fix literally every single UBS issue once you determine (after reasoned consideration and close inspection) that it's legit.">Copy</button>
+                    </div>
+                    <pre class="guide-prompt-text">Read about the ubs tool in AGENTS.md. Now run UBS and investigate and fix literally every single UBS issue once you determine (after reasoned consideration and close inspection) that it's legit.</pre>
+                  </div>
+                </div>
+              </div>
+
+              <div class="guide-step">
+                <div class="guide-step-track">
+                  <div class="guide-step-num" style="background:#06b6d4">5</div>
+                </div>
+                <div class="guide-step-content">
+                  <h4>Comprehensive tests</h4>
+                  <div class="guide-prompt-block">
+                    <div class="guide-prompt-header">
+                      <span class="guide-prompt-label">prompt · create_tests</span>
+                      <button class="guide-copy-btn" data-copy="Do we have full unit test coverage without using mocks/fake stuff? What about complete e2e integration test scripts with great, detailed logging? If not, then create a comprehensive and granular set of beads for all this with tasks, subtasks, and dependency structure overlaid with detailed comments.">Copy</button>
+                    </div>
+                    <pre class="guide-prompt-text">Do we have full unit test coverage without using mocks/fake stuff? What about complete e2e integration test scripts with great, detailed logging? If not, then create a comprehensive and granular set of beads for all this with tasks, subtasks, and dependency structure overlaid with detailed comments.</pre>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </details>
+      </div>
+
+      <!-- Phase 5: Deploy -->
+      <div class="guide-phase" id="phase-5">
+        <details>
+          <summary>
+            <div class="guide-phase-icon" style="background:linear-gradient(135deg,#f43f5e,#dc2626)">5</div>
+            <div class="guide-phase-meta">
+              <div class="guide-phase-title">Phase 5: Deploy &amp; Maintenance</div>
+              <div class="guide-phase-desc">Ship, then keep all projects moving every day</div>
+            </div>
+            <span class="guide-phase-chevron">▼</span>
+          </summary>
+          <div class="guide-phase-body">
+            <div class="guide-steps">
+              <div class="guide-step">
+                <div class="guide-step-track">
+                  <div class="guide-step-num" style="background:#f43f5e">1</div>
+                  <div class="guide-step-line"></div>
+                </div>
+                <div class="guide-step-content">
+                  <h4>Smart git commits (dedicated agent)</h4>
+                  <p>Use a dedicated agent to commit in logical groupings. Repeat every 15–20 min for multi-agent projects.</p>
+                  <div class="guide-prompt-block">
+                    <div class="guide-prompt-header">
+                      <span class="guide-prompt-label">prompt · git_commit</span>
+                      <button class="guide-copy-btn" data-copy="Now, based on your knowledge of the project, commit all changed files now in a series of logically connected groupings with super detailed commit messages for each and then push. Take your time to do it right. Don't edit the code at all. Don't commit obviously ephemeral files. Use /effort max.">Copy</button>
+                    </div>
+                    <pre class="guide-prompt-text">Now, based on your knowledge of the project, commit all changed files now in a series of logically connected groupings with super detailed commit messages for each and then push. Take your time to do it right. Don't edit the code at all. Don't commit obviously ephemeral files. Use /effort max.</pre>
+                  </div>
+                </div>
+              </div>
+
+              <div class="guide-step">
+                <div class="guide-step-track">
+                  <div class="guide-step-num" style="background:#f43f5e">2</div>
+                  <div class="guide-step-line"></div>
+                </div>
+                <div class="guide-step-content">
+                  <h4>Full GitHub deployment flow</h4>
+                  <div class="guide-prompt-block">
+                    <div class="guide-prompt-header">
+                      <span class="guide-prompt-label">prompt · gh_flow</span>
+                      <button class="guide-copy-btn" data-copy="Do all the GitHub stuff: commit, deploy, create tag, bump version, release, monitor gh actions, compute checksums, etc.">Copy</button>
+                    </div>
+                    <pre class="guide-prompt-text">Do all the GitHub stuff: commit, deploy, create tag, bump version, release, monitor gh actions, compute checksums, etc.</pre>
+                  </div>
+                </div>
+              </div>
+
+              <div class="guide-step">
+                <div class="guide-step-track">
+                  <div class="guide-step-num" style="background:#f43f5e">3</div>
+                </div>
+                <div class="guide-step-content">
+                  <h4>Daily maintenance across ALL your projects</h4>
+                  <p>Make forward progress on every active project, every day — even when too busy for deep work. Use autopilot prompts (section below). Come back 3+ hours later to see incredible work done autonomously.</p>
+                  <code class="guide-cmd">flywheel deploy</code> — requires typing <code>DEPLOY &lt;project-name&gt;</code> to confirm
+                </div>
+              </div>
+            </div>
+
+            <div class="guide-caution">
+              <strong>No human code edits post-agent work.</strong> Let agents handle git to avoid conflicts. Audit via exported mailboxes and bv time-travel features.
+            </div>
+          </div>
+        </details>
+      </div>
+
+      <!-- Daily Autopilot -->
+      <div class="guide-phase" id="autopilot">
+        <details>
+          <summary>
+            <div class="guide-phase-icon" style="background:linear-gradient(135deg,#6366f1,#4f46e5)">↻</div>
+            <div class="guide-phase-meta">
+              <div class="guide-phase-title">Daily Autopilot Mode</div>
+              <div class="guide-phase-desc">Keep every project moving with minimal effort</div>
+            </div>
+            <span class="guide-phase-chevron">▼</span>
+          </summary>
+          <div class="guide-phase-body">
+            <div class="guide-tip" style="margin-bottom:.75rem">
+              <strong>The reality:</strong> Run these prompts on 8+ projects daily, keeping 3 machines busy constantly.
+              Come back 3+ hours later to see incredible amounts of work done autonomously.
+              The compound effect is incredible — models are good enough, and agents catch each other's mistakes.
+            </div>
+
+            <div style="display:grid;gap:.75rem">
+              <div>
+                <p style="font-size:.88rem;font-weight:600;margin-bottom:.4rem">Random code inspection</p>
+                <div class="guide-prompt-block">
+                  <div class="guide-prompt-header">
+                    <span class="guide-prompt-label">prompt · randomly_inspect</span>
+                    <button class="guide-copy-btn" data-copy="I want you to sort of randomly explore the code files in this project, choosing code files to deeply investigate and understand and trace their functionality and execution flows through the related code files which they import or which they are imported by. Once you understand the purpose of the code in the larger context of the workflows, I want you to do a super careful, methodical, and critical check with &quot;fresh eyes&quot; to find any obvious bugs, problems, errors, issues, silly mistakes, etc. and then systematically and meticulously and intelligently correct them. Be sure to comply with ALL rules in AGENTS.md and ensure that any code you write or revise conforms to the best practice guides referenced in the AGENTS.md file.">Copy</button>
+                  </div>
+                  <pre class="guide-prompt-text">I want you to sort of randomly explore the code files in this project, choosing code files to deeply investigate and understand and trace their functionality and execution flows through the related code files which they import or which they are imported by. Once you understand the purpose of the code in the larger context of the workflows, I want you to do a super careful, methodical, and critical check with "fresh eyes" to find any obvious bugs, problems, errors, issues, silly mistakes, etc. and then systematically and meticulously and intelligently correct them. Be sure to comply with ALL rules in AGENTS.md and ensure that any code you write or revise conforms to the best practice guides referenced in the AGENTS.md file.</pre>
+                </div>
+              </div>
+
+              <div>
+                <p style="font-size:.88rem;font-weight:600;margin-bottom:.4rem">Queued workflow (Codex — set and forget)</p>
+                <p style="font-size:.82rem;color:var(--muted);margin-bottom:.5rem">Enter these upfront; Codex processes them sequentially while you're away:</p>
+                <div style="display:grid;gap:.4rem">
+                  <div style="display:flex;gap:.6rem;align-items:flex-start">
+                    <span style="background:#6366f1;color:white;border-radius:999px;width:1.4rem;height:1.4rem;display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:700;flex-shrink:0;margin-top:.1rem">1</span>
+                    <code class="guide-cmd" style="font-size:.76rem">scrutinize_ui → create_beads → improve_beads → work_on_beads → fresh_review → git_commit</code>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </details>
+      </div>
+
+      <!-- Prompt Library -->
+      <div class="guide-phase" id="prompts">
+        <details>
+          <summary>
+            <div class="guide-phase-icon" style="background:linear-gradient(135deg,#d946ef,#db2777)">⌨</div>
+            <div class="guide-phase-meta">
+              <div class="guide-phase-title">Complete Prompt Library</div>
+              <div class="guide-phase-desc">30+ prompts — click to expand and copy</div>
+            </div>
+            <span class="guide-phase-chevron">▼</span>
+          </summary>
+          <div class="guide-phase-body">
+
+            <div class="guide-library-section">
+              <div class="guide-library-section-title">Analysis &amp; Review</div>
+              <div class="guide-library-grid">
+
+                <div class="guide-prompt-card">
+                  <div class="guide-prompt-card-header">
+                    <div class="guide-prompt-card-info">
+                      <span class="guide-prompt-card-key">fresh_review</span>
+                      <div class="guide-prompt-card-name">Fresh Review</div>
+                      <div class="guide-prompt-card-desc">Self-review new code for bugs</div>
+                    </div>
+                    <span class="guide-prompt-card-toggle">▼</span>
+                  </div>
+                  <div class="guide-prompt-card-body">
+                    <div class="guide-prompt-card-body-inner">
+                      <div class="guide-prompt-card-actions">
+                        <button class="guide-copy-btn" data-copy="Great, now I want you to carefully read over all of the new code you just wrote and other existing code you just modified with &quot;fresh eyes&quot; looking super carefully for any obvious bugs, errors, problems, issues, confusion, etc. Carefully fix anything you uncover.">Copy prompt</button>
+                      </div>
+                      <pre class="guide-prompt-card-text">Great, now I want you to carefully read over all of the new code you just wrote and other existing code you just modified with "fresh eyes" looking super carefully for any obvious bugs, errors, problems, issues, confusion, etc. Carefully fix anything you uncover.</pre>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="guide-prompt-card">
+                  <div class="guide-prompt-card-header">
+                    <div class="guide-prompt-card-info">
+                      <span class="guide-prompt-card-key">check_other_agents</span>
+                      <div class="guide-prompt-card-name">Check Other Agents</div>
+                      <div class="guide-prompt-card-desc">Peer review agent work deeply</div>
+                    </div>
+                    <span class="guide-prompt-card-toggle">▼</span>
+                  </div>
+                  <div class="guide-prompt-card-body">
+                    <div class="guide-prompt-card-body-inner">
+                      <div class="guide-prompt-card-actions">
+                        <button class="guide-copy-btn" data-copy="Ok can you now turn your attention to reviewing the code written by your fellow agents and checking for any issues, bugs, errors, problems, inefficiencies, security problems, reliability issues, etc. and carefully diagnose their underlying root causes using first-principle analysis and then fix or revise them if necessary? Don't restrict yourself to the latest commits, cast a wider net and go super deep! Use /effort max.">Copy prompt</button>
+                      </div>
+                      <pre class="guide-prompt-card-text">Ok can you now turn your attention to reviewing the code written by your fellow agents and checking for any issues, bugs, errors, problems, inefficiencies, security problems, reliability issues, etc. and carefully diagnose their underlying root causes using first-principle analysis and then fix or revise them if necessary? Don't restrict yourself to the latest commits, cast a wider net and go super deep! Use /effort max.</pre>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="guide-prompt-card">
+                  <div class="guide-prompt-card-header">
+                    <div class="guide-prompt-card-info">
+                      <span class="guide-prompt-card-key">randomly_inspect</span>
+                      <div class="guide-prompt-card-name">Randomly Inspect</div>
+                      <div class="guide-prompt-card-desc">Deep code exploration with fresh eyes</div>
+                    </div>
+                    <span class="guide-prompt-card-toggle">▼</span>
+                  </div>
+                  <div class="guide-prompt-card-body">
+                    <div class="guide-prompt-card-body-inner">
+                      <div class="guide-prompt-card-actions">
+                        <button class="guide-copy-btn" data-copy="I want you to sort of randomly explore the code files in this project, choosing code files to deeply investigate and understand and trace their functionality and execution flows through the related code files which they import or which they are imported by. Once you understand the purpose of the code in the larger context of the workflows, I want you to do a super careful, methodical, and critical check with &quot;fresh eyes&quot; to find any obvious bugs, problems, errors, issues, silly mistakes, etc. and then systematically and meticulously and intelligently correct them. Be sure to comply with ALL rules in AGENTS.md and ensure that any code you write or revise conforms to the best practice guides referenced in the AGENTS.md file.">Copy prompt</button>
+                      </div>
+                      <pre class="guide-prompt-card-text">I want you to sort of randomly explore the code files in this project, choosing code files to deeply investigate and understand and trace their functionality and execution flows through the related code files which they import or which they are imported by. Once you understand the purpose of the code in the larger context of the workflows, I want you to do a super careful, methodical, and critical check with "fresh eyes" to find any obvious bugs, problems, errors, issues, silly mistakes, etc. and then systematically and meticulously and intelligently correct them. Be sure to comply with ALL rules in AGENTS.md and ensure that any code you write or revise conforms to the best practice guides referenced in the AGENTS.md file.</pre>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="guide-prompt-card">
+                  <div class="guide-prompt-card-header">
+                    <div class="guide-prompt-card-info">
+                      <span class="guide-prompt-card-key">scrutinize_ui</span>
+                      <div class="guide-prompt-card-name">Scrutinize UI/UX</div>
+                      <div class="guide-prompt-card-desc">Polish to Stripe-level quality</div>
+                    </div>
+                    <span class="guide-prompt-card-toggle">▼</span>
+                  </div>
+                  <div class="guide-prompt-card-body">
+                    <div class="guide-prompt-card-body-inner">
+                      <div class="guide-prompt-card-actions">
+                        <button class="guide-copy-btn" data-copy="Great, now I want you to super carefully scrutinize every aspect of the application workflow and implementation and look for things that just seem sub-optimal or even wrong/mistaken to you, things that could very obviously be improved from a user-friendliness and intuitiveness standpoint, places where our UI/UX could be improved and polished to be slicker, more visually appealing, and more premium feeling and just ultra high quality, like Stripe-level apps.">Copy prompt</button>
+                      </div>
+                      <pre class="guide-prompt-card-text">Great, now I want you to super carefully scrutinize every aspect of the application workflow and implementation and look for things that just seem sub-optimal or even wrong/mistaken to you, things that could very obviously be improved from a user-friendliness and intuitiveness standpoint, places where our UI/UX could be improved and polished to be slicker, more visually appealing, and more premium feeling and just ultra high quality, like Stripe-level apps.</pre>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="guide-prompt-card">
+                  <div class="guide-prompt-card-header">
+                    <div class="guide-prompt-card-info">
+                      <span class="guide-prompt-card-key">check_orm</span>
+                      <div class="guide-prompt-card-name">Check ORM/Schemas</div>
+                      <div class="guide-prompt-card-desc">Review database design critically</div>
+                    </div>
+                    <span class="guide-prompt-card-toggle">▼</span>
+                  </div>
+                  <div class="guide-prompt-card-body">
+                    <div class="guide-prompt-card-body-inner">
+                      <div class="guide-prompt-card-actions">
+                        <button class="guide-copy-btn" data-copy="Now reread AGENTS.md, read your README.md, and then I want you to use /effort max to super carefully and critically read the entire data ORM schema/models and look for any issues or problems, conceptual mistakes, logical errors, or anything that doesn't fit your understanding of the business strategy and accepted best practices for the design and architecture of databases for these sorts of ecommerce/saas projects/companies.">Copy prompt</button>
+                      </div>
+                      <pre class="guide-prompt-card-text">Now reread AGENTS.md, read your README.md, and then I want you to use /effort max to super carefully and critically read the entire data ORM schema/models and look for any issues or problems, conceptual mistakes, logical errors, or anything that doesn't fit your understanding of the business strategy and accepted best practices for the design and architecture of databases for these sorts of ecommerce/saas projects/companies.</pre>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="guide-prompt-card">
+                  <div class="guide-prompt-card-header">
+                    <div class="guide-prompt-card-info">
+                      <span class="guide-prompt-card-key">apply_ubs</span>
+                      <div class="guide-prompt-card-name">Apply UBS</div>
+                      <div class="guide-prompt-card-desc">Run bug scanner and fix all issues</div>
+                    </div>
+                    <span class="guide-prompt-card-toggle">▼</span>
+                  </div>
+                  <div class="guide-prompt-card-body">
+                    <div class="guide-prompt-card-body-inner">
+                      <div class="guide-prompt-card-actions">
+                        <button class="guide-copy-btn" data-copy="Read about the ubs tool in AGENTS.md. Now run UBS and investigate and fix literally every single UBS issue once you determine (after reasoned consideration and close inspection) that it's legit.">Copy prompt</button>
+                      </div>
+                      <pre class="guide-prompt-card-text">Read about the ubs tool in AGENTS.md. Now run UBS and investigate and fix literally every single UBS issue once you determine (after reasoned consideration and close inspection) that it's legit.</pre>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="guide-prompt-card">
+                  <div class="guide-prompt-card-header">
+                    <div class="guide-prompt-card-info">
+                      <span class="guide-prompt-card-key">use_dcg</span>
+                      <div class="guide-prompt-card-name">Use DCG</div>
+                      <div class="guide-prompt-card-desc">Block destructive commands pre-execution</div>
+                    </div>
+                    <span class="guide-prompt-card-toggle">▼</span>
+                  </div>
+                  <div class="guide-prompt-card-body">
+                    <div class="guide-prompt-card-body-inner">
+                      <div class="guide-prompt-card-actions">
+                        <button class="guide-copy-btn" data-copy="Before running any destructive command, use DCG to test it. If DCG blocks, propose a safer alternative and proceed only when explicitly approved. Also verify the hook is installed with dcg doctor.">Copy prompt</button>
+                      </div>
+                      <pre class="guide-prompt-card-text">Before running any destructive command, use DCG to test it. If DCG blocks, propose a safer alternative and proceed only when explicitly approved. Also verify the hook is installed with dcg doctor.</pre>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            <div class="guide-library-section">
+              <div class="guide-library-section-title">Planning &amp; Beads</div>
+              <div class="guide-library-grid">
+
+                <div class="guide-prompt-card">
+                  <div class="guide-prompt-card-header">
+                    <div class="guide-prompt-card-info">
+                      <span class="guide-prompt-card-key">combine_plans</span>
+                      <div class="guide-prompt-card-name">Combine Plans</div>
+                      <div class="guide-prompt-card-desc">Synthesize best of 3 AI plans</div>
+                    </div>
+                    <span class="guide-prompt-card-toggle">▼</span>
+                  </div>
+                  <div class="guide-prompt-card-body">
+                    <div class="guide-prompt-card-body-inner">
+                      <div class="guide-prompt-card-actions">
+                        <button class="guide-copy-btn" data-copy="I asked 3 competing LLMs to do the exact same thing and they came up with pretty different plans which you can read below. I want you to REALLY carefully analyze their plans with an open mind and be intellectually honest about what they did that's better than your plan. Then I want you to come up with the best possible revisions to your plan (you should simply update your existing document for your original plan with the revisions) that artfully and skillfully blends the &quot;best of all worlds&quot; to create a true, ultimate, superior hybrid version of the plan that best achieves our stated goals and will work the best in real-world practice to solve the problems we are facing and our overarching goals while ensuring the extreme success of the enterprise as best as possible; you should provide me with a complete series of git-diff style changes to your original plan to turn it into the new, enhanced, much longer and detailed plan that integrates the best of all the plans with every good idea included (you don't need to mention which ideas came from which models in the final revised enhanced plan):">Copy prompt</button>
+                      </div>
+                      <pre class="guide-prompt-card-text">I asked 3 competing LLMs to do the exact same thing and they came up with pretty different plans which you can read below. I want you to REALLY carefully analyze their plans with an open mind and be intellectually honest about what they did that's better than your plan. Then I want you to come up with the best possible revisions to your plan (you should simply update your existing document for your original plan with the revisions) that artfully and skillfully blends the "best of all worlds" to create a true, ultimate, superior hybrid version of the plan that best achieves our stated goals and will work the best in real-world practice to solve the problems we are facing and our overarching goals while ensuring the extreme success of the enterprise as best as possible; you should provide me with a complete series of git-diff style changes to your original plan to turn it into the new, enhanced, much longer and detailed plan that integrates the best of all the plans with every good idea included (you don't need to mention which ideas came from which models in the final revised enhanced plan):</pre>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="guide-prompt-card">
+                  <div class="guide-prompt-card-header">
+                    <div class="guide-prompt-card-info">
+                      <span class="guide-prompt-card-key">100_ideas</span>
+                      <div class="guide-prompt-card-name">Generate Ideas</div>
+                      <div class="guide-prompt-card-desc">Think of 100, show best 10</div>
+                    </div>
+                    <span class="guide-prompt-card-toggle">▼</span>
+                  </div>
+                  <div class="guide-prompt-card-body">
+                    <div class="guide-prompt-card-body-inner">
+                      <div class="guide-prompt-card-actions">
+                        <button class="guide-copy-btn" data-copy="OK so now I want you to come up with your top 10 most brilliant ideas for adding extremely powerful and cool functionality that will make this system far more compelling, useful, intuitive, versatile, powerful, robust, reliable, etc for the users. Use /effort max. But be pragmatic and don't think of features that will be extremely hard to implement or which aren't necessarily worth the additional complexity burden they would introduce. But I don't want you to just think of 10 ideas: I want you to seriously think hard and come up with one HUNDRED ideas and then only tell me your 10 VERY BEST and most brilliant, clever, and radically innovative and powerful ideas.">Copy prompt</button>
+                      </div>
+                      <pre class="guide-prompt-card-text">OK so now I want you to come up with your top 10 most brilliant ideas for adding extremely powerful and cool functionality that will make this system far more compelling, useful, intuitive, versatile, powerful, robust, reliable, etc for the users. Use /effort max. But be pragmatic and don't think of features that will be extremely hard to implement or which aren't necessarily worth the additional complexity burden they would introduce. But I don't want you to just think of 10 ideas: I want you to seriously think hard and come up with one HUNDRED ideas and then only tell me your 10 VERY BEST and most brilliant, clever, and radically innovative and powerful ideas.</pre>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="guide-prompt-card">
+                  <div class="guide-prompt-card-header">
+                    <div class="guide-prompt-card-info">
+                      <span class="guide-prompt-card-key">create_beads</span>
+                      <div class="guide-prompt-card-name">Create Beads</div>
+                      <div class="guide-prompt-card-desc">Transform plan into tasks</div>
+                    </div>
+                    <span class="guide-prompt-card-toggle">▼</span>
+                  </div>
+                  <div class="guide-prompt-card-body">
+                    <div class="guide-prompt-card-body-inner">
+                      <div class="guide-prompt-card-actions">
+                        <button class="guide-copy-btn" data-copy="OK so please take ALL of that and elaborate on it more and then create a comprehensive and granular set of beads for all this with tasks, subtasks, and dependency structure overlaid, with detailed comments so that the whole thing is totally self-contained and self-documenting (including relevant background, reasoning/justification, considerations, etc.-- anything we'd want our &quot;future self&quot; to know about the goals and intentions and thought process and how it serves the over-arching goals of the project.) Use the `br` tool repeatedly to create the actual beads. Use /effort max.">Copy prompt</button>
+                      </div>
+                      <pre class="guide-prompt-card-text">OK so please take ALL of that and elaborate on it more and then create a comprehensive and granular set of beads for all this with tasks, subtasks, and dependency structure overlaid, with detailed comments so that the whole thing is totally self-contained and self-documenting (including relevant background, reasoning/justification, considerations, etc.-- anything we'd want our "future self" to know about the goals and intentions and thought process and how it serves the over-arching goals of the project.) Use the `br` tool repeatedly to create the actual beads. Use /effort max.</pre>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="guide-prompt-card">
+                  <div class="guide-prompt-card-header">
+                    <div class="guide-prompt-card-info">
+                      <span class="guide-prompt-card-key">improve_beads</span>
+                      <div class="guide-prompt-card-name">Improve Beads</div>
+                      <div class="guide-prompt-card-desc">Iterate in plan space</div>
+                    </div>
+                    <span class="guide-prompt-card-toggle">▼</span>
+                  </div>
+                  <div class="guide-prompt-card-body">
+                    <div class="guide-prompt-card-body-inner">
+                      <div class="guide-prompt-card-actions">
+                        <button class="guide-copy-btn" data-copy="Check over each bead super carefully-- are you sure it makes sense? Is it optimal? Could we change anything to make the system work better for users? If so, revise the beads. It's a lot easier and faster to operate in &quot;plan space&quot; before we start implementing these things! Use /effort max.">Copy prompt</button>
+                      </div>
+                      <pre class="guide-prompt-card-text">Check over each bead super carefully-- are you sure it makes sense? Is it optimal? Could we change anything to make the system work better for users? If so, revise the beads. It's a lot easier and faster to operate in "plan space" before we start implementing these things! Use /effort max.</pre>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="guide-prompt-card">
+                  <div class="guide-prompt-card-header">
+                    <div class="guide-prompt-card-info">
+                      <span class="guide-prompt-card-key">work_on_beads</span>
+                      <div class="guide-prompt-card-name">Work on Beads</div>
+                      <div class="guide-prompt-card-desc">Execute tasks in optimal order</div>
+                    </div>
+                    <span class="guide-prompt-card-toggle">▼</span>
+                  </div>
+                  <div class="guide-prompt-card-body">
+                    <div class="guide-prompt-card-body-inner">
+                      <div class="guide-prompt-card-actions">
+                        <button class="guide-copy-btn" data-copy="OK, so start systematically and methodically and meticulously and diligently executing those remaining beads tasks that you created in the optimal logical order! Don't forget to mark beads as you work on them.">Copy prompt</button>
+                      </div>
+                      <pre class="guide-prompt-card-text">OK, so start systematically and methodically and meticulously and diligently executing those remaining beads tasks that you created in the optimal logical order! Don't forget to mark beads as you work on them.</pre>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="guide-prompt-card">
+                  <div class="guide-prompt-card-header">
+                    <div class="guide-prompt-card-info">
+                      <span class="guide-prompt-card-key">next_bead</span>
+                      <div class="guide-prompt-card-name">Next Bead</div>
+                      <div class="guide-prompt-card-desc">Pick and start next task</div>
+                    </div>
+                    <span class="guide-prompt-card-toggle">▼</span>
+                  </div>
+                  <div class="guide-prompt-card-body">
+                    <div class="guide-prompt-card-body-inner">
+                      <div class="guide-prompt-card-actions">
+                        <button class="guide-copy-btn" data-copy="Pick the next bead you can actually do usefully now and start coding on it immediately; communicate what you're working on to your fellow agents and mark beads appropriately as you work. And respond to any agent mail messages you've received.">Copy prompt</button>
+                      </div>
+                      <pre class="guide-prompt-card-text">Pick the next bead you can actually do usefully now and start coding on it immediately; communicate what you're working on to your fellow agents and mark beads appropriately as you work. And respond to any agent mail messages you've received.</pre>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="guide-prompt-card">
+                  <div class="guide-prompt-card-header">
+                    <div class="guide-prompt-card-info">
+                      <span class="guide-prompt-card-key">use_bv</span>
+                      <div class="guide-prompt-card-name">Use BV</div>
+                      <div class="guide-prompt-card-desc">Find most impactful bead via PageRank</div>
+                    </div>
+                    <span class="guide-prompt-card-toggle">▼</span>
+                  </div>
+                  <div class="guide-prompt-card-body">
+                    <div class="guide-prompt-card-body-inner">
+                      <div class="guide-prompt-card-actions">
+                        <button class="guide-copy-btn" data-copy="Use bv with the robot flags (see AGENTS.md for info on this) to find the most impactful bead(s) to work on next and then start on it. Remember to mark the beads appropriately and communicate with your fellow agents.">Copy prompt</button>
+                      </div>
+                      <pre class="guide-prompt-card-text">Use bv with the robot flags (see AGENTS.md for info on this) to find the most impactful bead(s) to work on next and then start on it. Remember to mark the beads appropriately and communicate with your fellow agents.</pre>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="guide-prompt-card">
+                  <div class="guide-prompt-card-header">
+                    <div class="guide-prompt-card-info">
+                      <span class="guide-prompt-card-key">analyze_beads</span>
+                      <div class="guide-prompt-card-name">Analyze &amp; Allocate</div>
+                      <div class="guide-prompt-card-desc">Distribute optimal work to agents</div>
+                    </div>
+                    <span class="guide-prompt-card-toggle">▼</span>
+                  </div>
+                  <div class="guide-prompt-card-body">
+                    <div class="guide-prompt-card-body-inner">
+                      <div class="guide-prompt-card-actions">
+                        <button class="guide-copy-btn" data-copy="Re-read AGENTS.md first. Then, can you try using bv to get some insights on what each agent should most usefully work on? Then share those insights with the other agents via agent mail and strongly suggest in your messages the optimal work for each one and explain how/why you came up with that using bv. Use /effort max.">Copy prompt</button>
+                      </div>
+                      <pre class="guide-prompt-card-text">Re-read AGENTS.md first. Then, can you try using bv to get some insights on what each agent should most usefully work on? Then share those insights with the other agents via agent mail and strongly suggest in your messages the optimal work for each one and explain how/why you came up with that using bv. Use /effort max.</pre>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="guide-prompt-card">
+                  <div class="guide-prompt-card-header">
+                    <div class="guide-prompt-card-info">
+                      <span class="guide-prompt-card-key">do_all</span>
+                      <div class="guide-prompt-card-name">Do All Of It</div>
+                      <div class="guide-prompt-card-desc">Execute everything with tracking</div>
+                    </div>
+                    <span class="guide-prompt-card-toggle">▼</span>
+                  </div>
+                  <div class="guide-prompt-card-body">
+                    <div class="guide-prompt-card-body-inner">
+                      <div class="guide-prompt-card-actions">
+                        <button class="guide-copy-btn" data-copy="OK, please do ALL of that now. Track work via br beads (no markdown TODO lists): create/claim/update/close beads as you go so nothing gets lost, and keep communicating via Agent Mail when you start/finish work.">Copy prompt</button>
+                      </div>
+                      <pre class="guide-prompt-card-text">OK, please do ALL of that now. Track work via br beads (no markdown TODO lists): create/claim/update/close beads as you go so nothing gets lost, and keep communicating via Agent Mail when you start/finish work.</pre>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            <div class="guide-library-section">
+              <div class="guide-library-section-title">Agent Coordination</div>
+              <div class="guide-library-grid">
+
+                <div class="guide-prompt-card">
+                  <div class="guide-prompt-card-header">
+                    <div class="guide-prompt-card-info">
+                      <span class="guide-prompt-card-key">new_agent</span>
+                      <div class="guide-prompt-card-name">New Agent</div>
+                      <div class="guide-prompt-card-desc">Initialize and join swarm</div>
+                    </div>
+                    <span class="guide-prompt-card-toggle">▼</span>
+                  </div>
+                  <div class="guide-prompt-card-body">
+                    <div class="guide-prompt-card-body-inner">
+                      <div class="guide-prompt-card-actions">
+                        <button class="guide-copy-btn" data-copy="First read ALL of the AGENTS.md file and README.md file super carefully and understand ALL of both! Then use your code investigation agent mode to fully understand the code, and technical architecture and purpose of the project. Then register with MCP Agent Mail and introduce yourself to the other agents. Be sure to check your agent mail and to promptly respond if needed to any messages; then proceed meticulously with your next assigned beads, working on the tasks systematically and meticulously and tracking your progress via beads and agent mail messages. Don't get stuck in &quot;communication purgatory&quot; where nothing is getting done; be proactive about starting tasks that need to be done, but inform your fellow agents via messages when you do so and mark beads appropriately. When you're not sure what to do next, use the bv tool mentioned in AGENTS.md to prioritize the best beads to work on next; pick the next one that you can usefully work on and get started. Make sure to acknowledge all communication requests from other agents and that you are aware of all active agents and their names. Use /effort max.">Copy prompt</button>
+                      </div>
+                      <pre class="guide-prompt-card-text">First read ALL of the AGENTS.md file and README.md file super carefully and understand ALL of both! Then use your code investigation agent mode to fully understand the code, and technical architecture and purpose of the project. Then register with MCP Agent Mail and introduce yourself to the other agents. Be sure to check your agent mail and to promptly respond if needed to any messages; then proceed meticulously with your next assigned beads, working on the tasks systematically and meticulously and tracking your progress via beads and agent mail messages. Don't get stuck in "communication purgatory" where nothing is getting done; be proactive about starting tasks that need to be done, but inform your fellow agents via messages when you do so and mark beads appropriately. When you're not sure what to do next, use the bv tool mentioned in AGENTS.md to prioritize the best beads to work on next; pick the next one that you can usefully work on and get started. Make sure to acknowledge all communication requests from other agents and that you are aware of all active agents and their names. Use /effort max.</pre>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="guide-prompt-card">
+                  <div class="guide-prompt-card-header">
+                    <div class="guide-prompt-card-info">
+                      <span class="guide-prompt-card-key">check_mail</span>
+                      <div class="guide-prompt-card-name">Check Mail</div>
+                      <div class="guide-prompt-card-desc">Process agent messages</div>
+                    </div>
+                    <span class="guide-prompt-card-toggle">▼</span>
+                  </div>
+                  <div class="guide-prompt-card-body">
+                    <div class="guide-prompt-card-body-inner">
+                      <div class="guide-prompt-card-actions">
+                        <button class="guide-copy-btn" data-copy="Be sure to check your agent mail and to promptly respond if needed to any messages, and also acknowledge any contact requests; make sure you know the names of all active agents using the MCP Agent Mail system.">Copy prompt</button>
+                      </div>
+                      <pre class="guide-prompt-card-text">Be sure to check your agent mail and to promptly respond if needed to any messages, and also acknowledge any contact requests; make sure you know the names of all active agents using the MCP Agent Mail system.</pre>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="guide-prompt-card">
+                  <div class="guide-prompt-card-header">
+                    <div class="guide-prompt-card-info">
+                      <span class="guide-prompt-card-key">start_with_mail</span>
+                      <div class="guide-prompt-card-name">Start With Mail</div>
+                      <div class="guide-prompt-card-desc">Check mail then proceed</div>
+                    </div>
+                    <span class="guide-prompt-card-toggle">▼</span>
+                  </div>
+                  <div class="guide-prompt-card-body">
+                    <div class="guide-prompt-card-body-inner">
+                      <div class="guide-prompt-card-actions">
+                        <button class="guide-copy-btn" data-copy="Be sure to check your agent mail and to promptly respond if needed to any messages; then proceed meticulously with your next assigned beads, working on the tasks systematically and meticulously and tracking your progress via beads and agent mail messages. Don't get stuck in &quot;communication purgatory&quot; where nothing is getting done; be proactive about starting tasks that need to be done, but inform your fellow agents via messages when you do so and mark beads appropriately. When you're really not sure what to do, pick the next bead that you can usefully work on and get started. Make sure to acknowledge all communication requests from other agents and that you are aware of all active agents and their names. Use /effort max.">Copy prompt</button>
+                      </div>
+                      <pre class="guide-prompt-card-text">Be sure to check your agent mail and to promptly respond if needed to any messages; then proceed meticulously with your next assigned beads, working on the tasks systematically and meticulously and tracking your progress via beads and agent mail messages. Don't get stuck in "communication purgatory" where nothing is getting done; be proactive about starting tasks that need to be done, but inform your fellow agents via messages when you do so and mark beads appropriately. When you're really not sure what to do, pick the next bead that you can usefully work on and get started. Make sure to acknowledge all communication requests from other agents and that you are aware of all active agents and their names. Use /effort max.</pre>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            <div class="guide-library-section">
+              <div class="guide-library-section-title">Coding &amp; Development</div>
+              <div class="guide-library-grid">
+
+                <div class="guide-prompt-card">
+                  <div class="guide-prompt-card-header">
+                    <div class="guide-prompt-card-info">
+                      <span class="guide-prompt-card-key">fix_bug</span>
+                      <div class="guide-prompt-card-name">Fix Bug</div>
+                      <div class="guide-prompt-card-desc">Diagnose and fix root cause (not bandaid)</div>
+                    </div>
+                    <span class="guide-prompt-card-toggle">▼</span>
+                  </div>
+                  <div class="guide-prompt-card-body">
+                    <div class="guide-prompt-card-body-inner">
+                      <div class="guide-prompt-card-actions">
+                        <button class="guide-copy-btn" data-copy="I want you to very carefully diagnose and then fix the root underlying cause of the bugs/errors shown here, but fix them FOR REAL, not a superficial &quot;bandaid&quot; fix! Here are the details:">Copy prompt</button>
+                      </div>
+                      <pre class="guide-prompt-card-text">I want you to very carefully diagnose and then fix the root underlying cause of the bugs/errors shown here, but fix them FOR REAL, not a superficial "bandaid" fix! Here are the details:</pre>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="guide-prompt-card">
+                  <div class="guide-prompt-card-header">
+                    <div class="guide-prompt-card-info">
+                      <span class="guide-prompt-card-key">create_tests</span>
+                      <div class="guide-prompt-card-name">Create Tests</div>
+                      <div class="guide-prompt-card-desc">Comprehensive test coverage (no mocks)</div>
+                    </div>
+                    <span class="guide-prompt-card-toggle">▼</span>
+                  </div>
+                  <div class="guide-prompt-card-body">
+                    <div class="guide-prompt-card-body-inner">
+                      <div class="guide-prompt-card-actions">
+                        <button class="guide-copy-btn" data-copy="Do we have full unit test coverage without using mocks/fake stuff? What about complete e2e integration test scripts with great, detailed logging? If not, then create a comprehensive and granular set of beads for all this with tasks, subtasks, and dependency structure overlaid with detailed comments.">Copy prompt</button>
+                      </div>
+                      <pre class="guide-prompt-card-text">Do we have full unit test coverage without using mocks/fake stuff? What about complete e2e integration test scripts with great, detailed logging? If not, then create a comprehensive and granular set of beads for all this with tasks, subtasks, and dependency structure overlaid with detailed comments.</pre>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="guide-prompt-card">
+                  <div class="guide-prompt-card-header">
+                    <div class="guide-prompt-card-info">
+                      <span class="guide-prompt-card-key">build_ui_ux</span>
+                      <div class="guide-prompt-card-name">Build UI/UX</div>
+                      <div class="guide-prompt-card-desc">World-class component development</div>
+                    </div>
+                    <span class="guide-prompt-card-toggle">▼</span>
+                  </div>
+                  <div class="guide-prompt-card-body">
+                    <div class="guide-prompt-card-body-inner">
+                      <div class="guide-prompt-card-actions">
+                        <button class="guide-copy-btn" data-copy="I also want you to do a spectacular job building absolutely world-class UI/UX components, with an intense focus on making the most visually appealing, user-friendly, intuitive, slick, polished, &quot;Stripe level&quot; of quality UI/UX possible for this that leverages the good libraries that are already part of the project.">Copy prompt</button>
+                      </div>
+                      <pre class="guide-prompt-card-text">I also want you to do a spectacular job building absolutely world-class UI/UX components, with an intense focus on making the most visually appealing, user-friendly, intuitive, slick, polished, "Stripe level" of quality UI/UX possible for this that leverages the good libraries that are already part of the project.</pre>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            <div class="guide-library-section">
+              <div class="guide-library-section-title">Git &amp; Operations</div>
+              <div class="guide-library-grid">
+
+                <div class="guide-prompt-card">
+                  <div class="guide-prompt-card-header">
+                    <div class="guide-prompt-card-info">
+                      <span class="guide-prompt-card-key">git_commit</span>
+                      <div class="guide-prompt-card-name">Git Commit</div>
+                      <div class="guide-prompt-card-desc">Smart grouped commits + push</div>
+                    </div>
+                    <span class="guide-prompt-card-toggle">▼</span>
+                  </div>
+                  <div class="guide-prompt-card-body">
+                    <div class="guide-prompt-card-body-inner">
+                      <div class="guide-prompt-card-actions">
+                        <button class="guide-copy-btn" data-copy="Now, based on your knowledge of the project, commit all changed files now in a series of logically connected groupings with super detailed commit messages for each and then push. Take your time to do it right. Don't edit the code at all. Don't commit obviously ephemeral files. Use /effort max.">Copy prompt</button>
+                      </div>
+                      <pre class="guide-prompt-card-text">Now, based on your knowledge of the project, commit all changed files now in a series of logically connected groupings with super detailed commit messages for each and then push. Take your time to do it right. Don't edit the code at all. Don't commit obviously ephemeral files. Use /effort max.</pre>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="guide-prompt-card">
+                  <div class="guide-prompt-card-header">
+                    <div class="guide-prompt-card-info">
+                      <span class="guide-prompt-card-key">gh_flow</span>
+                      <div class="guide-prompt-card-name">GH Flow</div>
+                      <div class="guide-prompt-card-desc">Full GitHub workflow end-to-end</div>
+                    </div>
+                    <span class="guide-prompt-card-toggle">▼</span>
+                  </div>
+                  <div class="guide-prompt-card-body">
+                    <div class="guide-prompt-card-body-inner">
+                      <div class="guide-prompt-card-actions">
+                        <button class="guide-copy-btn" data-copy="Do all the GitHub stuff: commit, deploy, create tag, bump version, release, monitor gh actions, compute checksums, etc.">Copy prompt</button>
+                      </div>
+                      <pre class="guide-prompt-card-text">Do all the GitHub stuff: commit, deploy, create tag, bump version, release, monitor gh actions, compute checksums, etc.</pre>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            <div class="guide-library-section">
+              <div class="guide-library-section-title">Investigation &amp; Documentation</div>
+              <div class="guide-library-grid">
+
+                <div class="guide-prompt-card">
+                  <div class="guide-prompt-card-header">
+                    <div class="guide-prompt-card-info">
+                      <span class="guide-prompt-card-key">read_investigate</span>
+                      <div class="guide-prompt-card-name">Read &amp; Investigate</div>
+                      <div class="guide-prompt-card-desc">Deep project understanding first</div>
+                    </div>
+                    <span class="guide-prompt-card-toggle">▼</span>
+                  </div>
+                  <div class="guide-prompt-card-body">
+                    <div class="guide-prompt-card-body-inner">
+                      <div class="guide-prompt-card-actions">
+                        <button class="guide-copy-btn" data-copy="First read ALL of the AGENTS.md file and README.md file super carefully and understand ALL of both! Then use your code investigation agent mode to fully understand the code, and technical architecture and purpose of the project.">Copy prompt</button>
+                      </div>
+                      <pre class="guide-prompt-card-text">First read ALL of the AGENTS.md file and README.md file super carefully and understand ALL of both! Then use your code investigation agent mode to fully understand the code, and technical architecture and purpose of the project.</pre>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="guide-prompt-card">
+                  <div class="guide-prompt-card-header">
+                    <div class="guide-prompt-card-info">
+                      <span class="guide-prompt-card-key">reread_agents</span>
+                      <div class="guide-prompt-card-name">Reread AGENTS.md</div>
+                      <div class="guide-prompt-card-desc">Refresh agent context mid-session</div>
+                    </div>
+                    <span class="guide-prompt-card-toggle">▼</span>
+                  </div>
+                  <div class="guide-prompt-card-body">
+                    <div class="guide-prompt-card-body-inner">
+                      <div class="guide-prompt-card-actions">
+                        <button class="guide-copy-btn" data-copy="Reread AGENTS.md so it's still fresh in your mind.">Copy prompt</button>
+                      </div>
+                      <pre class="guide-prompt-card-text">Reread AGENTS.md so it's still fresh in your mind.</pre>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="guide-prompt-card">
+                  <div class="guide-prompt-card-header">
+                    <div class="guide-prompt-card-info">
+                      <span class="guide-prompt-card-key">complete_docs</span>
+                      <div class="guide-prompt-card-name">Complete Docs</div>
+                      <div class="guide-prompt-card-desc">Expand documentation exhaustively</div>
+                    </div>
+                    <span class="guide-prompt-card-toggle">▼</span>
+                  </div>
+                  <div class="guide-prompt-card-body">
+                    <div class="guide-prompt-card-body-inner">
+                      <div class="guide-prompt-card-actions">
+                        <button class="guide-copy-btn" data-copy="Now I need you to look through the existing documentation in our docusaurus site here and look for the (many, many) instances of functionality in our project that are not described or explained at all yet (or explained inadequately) in the docusaurus site, and then create and expand the documentation in the site to cover these in an exhaustive, intuitive, helpful, useful, pragmatic way. Don't just make a dump of methods, parameters, etc. Add actually well-written narrative explaining what the stuff does, how it is organized, etc. to help another developer understand how it all works so that they can usefully contribute to the system.">Copy prompt</button>
+                      </div>
+                      <pre class="guide-prompt-card-text">Now I need you to look through the existing documentation in our docusaurus site here and look for the (many, many) instances of functionality in our project that are not described or explained at all yet (or explained inadequately) in the docusaurus site, and then create and expand the documentation in the site to cover these in an exhaustive, intuitive, helpful, useful, pragmatic way. Don't just make a dump of methods, parameters, etc. Add actually well-written narrative explaining what the stuff does, how it is organized, etc. to help another developer understand how it all works so that they can usefully contribute to the system.</pre>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="guide-prompt-card">
+                  <div class="guide-prompt-card-header">
+                    <div class="guide-prompt-card-info">
+                      <span class="guide-prompt-card-key">improve_readme</span>
+                      <div class="guide-prompt-card-name">Improve README</div>
+                      <div class="guide-prompt-card-desc">Add incremental narrative content</div>
+                    </div>
+                    <span class="guide-prompt-card-toggle">▼</span>
+                  </div>
+                  <div class="guide-prompt-card-body">
+                    <div class="guide-prompt-card-body-inner">
+                      <div class="guide-prompt-card-actions">
+                        <button class="guide-copy-btn" data-copy="What else can we put in there to make the README longer and more detailed about what we built, why it's useful, how it works, the algorithms/design principles used, etc. This is incremental NEW content, not replacement for what is there already.">Copy prompt</button>
+                      </div>
+                      <pre class="guide-prompt-card-text">What else can we put in there to make the README longer and more detailed about what we built, why it's useful, how it works, the algorithms/design principles used, etc. This is incremental NEW content, not replacement for what is there already.</pre>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+          </div>
+        </details>
+      </div>
+
+    </main>
+
+    <script src="./guide.js"></script>
+  </body>
+</html>

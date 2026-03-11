@@ -594,6 +594,21 @@ export class FlywheelServer {
       return;
     }
 
+    if (request.method === "GET" && request.url === "/guide") {
+      void this.respondDashboardAsset(response, "guide.html", "text/html; charset=utf-8");
+      return;
+    }
+
+    if (request.method === "GET" && request.url === "/guide.css") {
+      void this.respondDashboardAsset(response, "guide.css", "text/css; charset=utf-8");
+      return;
+    }
+
+    if (request.method === "GET" && request.url === "/guide.js") {
+      void this.respondDashboardAsset(response, "guide.js", "application/javascript; charset=utf-8");
+      return;
+    }
+
     if (request.method === "GET" && request.url === "/cost") {
       this.respondJson(response, 200, this.getCostSummary());
       return;
