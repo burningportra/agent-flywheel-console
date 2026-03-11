@@ -120,7 +120,8 @@ export interface DashboardSnapshot {
 export type DashboardAction =
   | {
       type: "prompt.send";
-      promptName: string;
+      promptName?: string;     // named prompt from prompts.yaml
+      promptText?: string;     // arbitrary text (bypasses prompts.yaml lookup)
       pane?: number;
       all?: boolean;
       variables?: Record<string, string>;
@@ -494,13 +495,20 @@ export class FlywheelServer {
   private async handlePromptSend(
     action: Extract<DashboardAction, { type: "prompt.send" }>
   ): Promise<unknown> {
-    const prompt = getPrompt(action.promptName);
+    let rawText: string;
 
-    if (!prompt) {
-      throw new Error(`Unknown prompt: ${action.promptName}`);
+    if (action.promptText) {
+      // Arbitrary text sent directly from the dashboard (e.g. phase step prompts).
+      rawText = action.promptText;
+    } else {
+      const prompt = getPrompt(action.promptName ?? "");
+      if (!prompt) {
+        throw new Error(`Unknown prompt: ${action.promptName}`);
+      }
+      rawText = prompt.text;
     }
 
-    const resolvedPrompt = substituteVariables(prompt.text, {
+    const resolvedPrompt = substituteVariables(rawText, {
       ...this.promptVariables,
       ...(action.variables ?? {}),
     });
@@ -522,7 +530,8 @@ export class FlywheelServer {
         timeoutMs: 30_000,
       });
 
-      this.stateManager.logPromptSend(action.promptName, target, this.resolveRunId());
+      const promptLabel = action.promptName ?? "step-prompt";
+      this.stateManager.logPromptSend(promptLabel, target, this.resolveRunId());
       return parseJsonOrThrow(result.stdout, "ntm send --all --json");
     }
 
@@ -531,7 +540,8 @@ export class FlywheelServer {
     }
 
     const result = await this.ntmBridge.send(targetSession, action.pane, resolvedPrompt);
-    this.stateManager.logPromptSend(action.promptName, target, this.resolveRunId());
+    const promptLabel = action.promptName ?? "step-prompt";
+    this.stateManager.logPromptSend(promptLabel, target, this.resolveRunId());
     return result;
   }
 

@@ -1122,3 +1122,92 @@ details[open] .system-summary::before {
   max-width: 62ch;
   margin-top: 0.15rem;
 }
+
+/* Agent selector pills */
+.agent-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.55rem;
+}
+
+.agent-pill {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.72rem;
+  padding: 0.28rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid rgba(141, 166, 198, 0.28);
+  background: rgba(8, 16, 29, 0.72);
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 130ms ease, background 130ms ease;
+}
+
+.agent-pill:hover:not(:disabled) {
+  border-color: rgba(128, 216, 255, 0.55);
+  background: rgba(128, 216, 255, 0.08);
+}
+
+.agent-pill:disabled { opacity: 0.45; cursor: wait; }
+
+.agent-pill--all {
+  border-color: rgba(249, 191, 103, 0.4);
+  color: var(--amber);
+}
+
+.agent-pill--all:hover:not(:disabled) {
+  background: rgba(249, 191, 103, 0.1);
+  border-color: rgba(249, 191, 103, 0.7);
+}
+
+.agent-pill-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.agent-pill-type {
+  color: var(--muted);
+  font-size: 0.65rem;
+}
+
+.dot--active, .step-dot--active { background: var(--mint); }
+.dot--stuck, .step-dot--stuck   { background: var(--coral); }
+.dot--idle, .step-dot--idle     { background: var(--sky); }
+
+/* Step send result (after delivery) */
+.step-send-result {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-top: 0.5rem;
+  line-height: 1.55;
+}
+
+.step-agent-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.step-agent-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  margin-right: 0.2rem;
+  vertical-align: middle;
+}
+
+.step-no-agents {
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-style: italic;
+  margin: 0;
+}

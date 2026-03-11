@@ -27,6 +27,8 @@ const state: {
   reconnectDelayMs: number;
   reconnectMessageShown: boolean;
   promptCatalog: Map<string, PromptSummary>;
+  sentSteps: Map<string, { panes: number[]; label: string; deliveredAt: string }>;
+  lastPhase: string | null;
 } = {
   snapshot: null,
   socket: null,
@@ -34,6 +36,8 @@ const state: {
   reconnectDelayMs: 1500,
   reconnectMessageShown: false,
   promptCatalog: new Map(),
+  sentSteps: new Map<string, { panes: number[]; label: string; deliveredAt: string }>(),
+  lastPhase: null,
 };
 
 const ui = {
@@ -143,6 +147,17 @@ function getPhaseSteps(snapshot: DashboardSnapshot): PhaseStep[] {
   const gateEnabled = snapshot.actionStates["gate.advance"]?.enabled ?? false;
   const hasAgents = agents.length > 0;
 
+  const stepKey = (idx: number) => `${phase ?? "none"}:${idx}`;
+  const isSent = (idx: number) => state.sentSteps.has(stepKey(idx));
+
+  function stepState(idx: number, fallback: "current" | "upcoming"): "done" | "current" | "upcoming" {
+    if (isSent(idx)) return "done";
+    for (let i = 0; i < idx; i++) {
+      if (!isSent(i)) return "upcoming";
+    }
+    return fallback;
+  }
+
   if (!snapshot.run) {
     const sshOk = snapshot.ssh.connected;
     return [
@@ -152,13 +167,13 @@ function getPhaseSteps(snapshot: DashboardSnapshot): PhaseStep[] {
           ? `Connected to ${snapshot.ssh.host ?? "your server"} ✓`
           : "Tell the console where your ACFS server is. You'll need your server IP address, SSH username, and private key path.",
         command: "flywheel settings ssh",
-        state: sshOk ? "done" : "current",
+        state: isSent(0) ? "done" : sshOk ? "done" : "current",
       },
       {
         title: "Start your first project",
         detail: "Describe what you want to build. The planning wizard will ask three AI models to plan it in parallel, then synthesize their best ideas.",
         command: 'flywheel new "describe what you want to build"',
-        state: sshOk ? "current" : "upcoming",
+        state: stepState(1, sshOk ? "current" : "upcoming"),
       },
     ];
   }
@@ -168,34 +183,34 @@ function getPhaseSteps(snapshot: DashboardSnapshot): PhaseStep[] {
       {
         title: "Ask three AI models to plan your project",
         detail: "Open ChatGPT (GPT-4o or newer), Claude.ai (Opus), and Google Gemini. Give each one the same description of what you want to build. Don't worry about perfection — you're collecting three different perspectives.",
-        state: "current",
+        state: stepState(0, "current"),
       },
       {
         title: "Synthesize: combine the best of all three plans",
         detail: "Paste all three plans back into your primary AI with this prompt. It will honestly compare them, take the best ideas from each, and produce a single superior plan.",
         promptText: P_COMBINE_PLANS,
         promptLabel: "Copy combine_plans prompt",
-        state: "upcoming",
+        state: stepState(1, "upcoming"),
       },
       {
         title: "Generate brilliant feature ideas",
         detail: "This prompt forces the AI to think of 100 ideas before picking the best 10 — much better than asking for 10 directly. Run it 2-3 times for compounding results.",
         promptText: P_100_IDEAS,
         promptLabel: "Copy 100_ideas prompt",
-        state: "upcoming",
+        state: stepState(2, "upcoming"),
       },
       {
         title: "Run the local planning wizard",
         detail: "This orchestrates the multi-model planning automatically and saves a plan.md file. Run it after you have your synthesized plan ready.",
         command: 'flywheel new "your idea"',
-        state: "upcoming",
+        state: stepState(3, "upcoming"),
       },
       {
         title: "Advance to task breakdown (Beads)",
         detail: gateEnabled
           ? "Your plan looks good. When you're ready to break it into tasks, advance the gate below."
           : "Complete the planning steps above, then advance the gate to move to the task breakdown phase.",
-        state: gateEnabled ? "current" : "upcoming",
+        state: stepState(4, gateEnabled ? "current" : "upcoming"),
       },
     ];
   }
@@ -207,27 +222,27 @@ function getPhaseSteps(snapshot: DashboardSnapshot): PhaseStep[] {
         detail: "Beads are granular tasks with dependencies — like a smart to-do list. This prompt creates them automatically from your plan, with enough context in each task that an agent can work on it independently without needing to re-read the whole plan.",
         promptText: P_CREATE_BEADS,
         promptLabel: "Copy create_beads prompt",
-        state: "current",
+        state: stepState(0, "current"),
       },
       {
         title: "Review and refine the task breakdown",
         detail: "It's much cheaper to fix issues in task-space than code-space. This prompt reviews every bead for clarity, feasibility, and optimal sequencing — and revises them. Do this before any code is written.",
         promptText: P_IMPROVE_BEADS,
         promptLabel: "Copy improve_beads prompt",
-        state: "upcoming",
+        state: stepState(1, "upcoming"),
       },
       {
         title: "Analyze task priorities with Beads Viewer",
         detail: "bv uses PageRank to score which tasks are most important (blocking the most other tasks). Run this to see your critical path — the sequence of tasks that determines your minimum ship date.",
         command: "bv --robot-triage",
-        state: "upcoming",
+        state: stepState(2, "upcoming"),
       },
       {
         title: "Advance to the implementation swarm",
         detail: gateEnabled
           ? "Task breakdown looks good. When you're ready to start coding, advance the gate."
           : "Finalize your beads above, then advance the gate to start spawning agents.",
-        state: gateEnabled ? "current" : "upcoming",
+        state: stepState(3, gateEnabled ? "current" : "upcoming"),
       },
     ];
   }
@@ -260,7 +275,7 @@ function getPhaseSteps(snapshot: DashboardSnapshot): PhaseStep[] {
           ? `${agents.length} agent${agents.length === 1 ? "" : "s"} running in NTM (tmux panes on the VPS)`
           : "NTM (Node Tmux Manager) creates terminal panes on your VPS — one per agent. Each agent is a Claude, Codex, or Gemini instance. Start with 4-8 agents; scale up as you see results.",
         command: "flywheel swarm 6",
-        state: hasAgents ? "done" : "current",
+        state: isSent(0) ? "done" : hasAgents ? "done" : "current",
       },
       {
         title: "Initialize each agent",
@@ -269,21 +284,21 @@ function getPhaseSteps(snapshot: DashboardSnapshot): PhaseStep[] {
           : "Copy this prompt into each agent pane. It tells the agent to read your project docs, register an identity with Agent Mail (so agents can coordinate), and start picking up tasks from your bead list.",
         promptText: P_NEW_AGENT,
         promptLabel: "Copy new_agent prompt",
-        state: hasAgents ? "done" : "upcoming",
+        state: stepState(1, hasAgents ? "current" : "upcoming"),
       },
       {
         title: step3Title,
         detail: step3Detail,
         promptText: stuck.length > 0 ? P_CHECK_MAIL : P_NEXT_BEAD,
         promptLabel: stuck.length > 0 ? "Copy check_mail prompt" : "Copy next_bead prompt",
-        state: hasAgents ? "current" : "upcoming",
+        state: stepState(2, hasAgents ? "current" : "upcoming"),
       },
       {
         title: "Advance to review",
         detail: beadsDone
           ? "All tasks are closed. When you're satisfied with the work, advance to the review phase."
           : "This step becomes available when all tasks (beads) are closed.",
-        state: beadsDone && gateEnabled ? "current" : "upcoming",
+        state: stepState(3, beadsDone && gateEnabled ? "current" : "upcoming"),
       },
     ];
   }
@@ -298,35 +313,35 @@ function getPhaseSteps(snapshot: DashboardSnapshot): PhaseStep[] {
         command: hasAgents ? undefined : "flywheel swarm 3",
         promptText: hasAgents ? P_FRESH_REVIEW : undefined,
         promptLabel: hasAgents ? "Copy fresh_review prompt" : undefined,
-        state: "current",
+        state: stepState(0, "current"),
       },
       {
         title: "Peer review — agents check each other's code",
         detail: "Each agent reviews code written by the other agents, not their own. Different agents have different blind spots — this cross-review catches issues that fresh review misses.",
         promptText: P_PEER_REVIEW,
         promptLabel: "Copy check_other_agents prompt",
-        state: "upcoming",
+        state: stepState(1, "upcoming"),
       },
       {
         title: "UI/UX scrutiny — polish to Stripe-level quality",
         detail: "Send to your most capable agent (Claude Opus or GPT-4o). It will go through the entire user-facing experience looking for anything that feels off — unclear interactions, visual rough edges, confusing flows.",
         promptText: P_SCRUTINIZE_UI,
         promptLabel: "Copy scrutinize_ui prompt",
-        state: "upcoming",
+        state: stepState(2, "upcoming"),
       },
       {
         title: "UBS scan — systematic bug detection",
         detail: "UBS (Ultimate Bug Scanner) runs a structured sweep across the entire codebase looking for common error patterns, security issues, and edge cases. More thorough than a manual review.",
         promptText: P_APPLY_UBS,
         promptLabel: "Copy apply_ubs prompt",
-        state: "upcoming",
+        state: stepState(3, "upcoming"),
       },
       {
         title: "Advance to deploy",
         detail: gateEnabled
           ? "Review passes are complete. When you're satisfied with code quality, advance to deploy."
           : "Run the review passes above, then advance the gate when you're satisfied.",
-        state: gateEnabled ? "current" : "upcoming",
+        state: stepState(4, gateEnabled ? "current" : "upcoming"),
       },
     ];
   }
@@ -338,20 +353,20 @@ function getPhaseSteps(snapshot: DashboardSnapshot): PhaseStep[] {
         detail: "Rather than one giant commit, this prompt groups changes by feature or concern and writes detailed commit messages for each group. This makes the git history readable and reversible.",
         promptText: P_GIT_COMMIT,
         promptLabel: "Copy git_commit prompt",
-        state: "current",
+        state: stepState(0, "current"),
       },
       {
         title: "Run the full GitHub deployment flow",
         detail: "Creates a version tag, bumps the version number, drafts a release, monitors GitHub Actions, and computes checksums. One prompt handles the whole release pipeline.",
         promptText: P_GH_FLOW,
         promptLabel: "Copy gh_flow prompt",
-        state: "upcoming",
+        state: stepState(1, "upcoming"),
       },
       {
         title: "Deploy",
         detail: "The CLI will ask you to type DEPLOY <project-name> to confirm — a deliberate step to prevent accidental deploys. This is the final action.",
         command: "flywheel deploy",
-        state: "upcoming",
+        state: stepState(2, "upcoming"),
       },
     ];
   }
@@ -411,6 +426,36 @@ function renderPhaseIntro(snapshot: DashboardSnapshot): void {
   ui.phaseIntro.replaceChildren(fragment);
 }
 
+async function sendStepPrompt(
+  snapshot: DashboardSnapshot,
+  promptText: string,
+  stepKey: string,
+  stepLabel: string,
+  pane: number | "all"
+): Promise<void> {
+  const payload: Record<string, unknown> = {
+    type: "prompt.send",
+    promptText,
+    ...(pane === "all" ? { all: true } : { pane }),
+  };
+
+  const result = await postAction(payload);
+  if (result.ok) {
+    const panes = pane === "all"
+      ? snapshot.agents.map((a: AgentStatus) => a.pane)
+      : [pane as number];
+    state.sentSteps.set(stepKey, {
+      panes,
+      label: stepLabel,
+      deliveredAt: new Date().toISOString(),
+    });
+    logAction(`Sent "${stepLabel}" to ${pane === "all" ? "all agents" : `pane ${pane}`}`);
+    await fetchSnapshot(); // triggers re-render via applySnapshot
+  } else {
+    logAction(`Failed to send "${stepLabel}": ${result.error ?? "unknown error"}`, true);
+  }
+}
+
 function renderPhaseSteps(snapshot: DashboardSnapshot): void {
   const steps = getPhaseSteps(snapshot);
   const fragment = document.createDocumentFragment();
@@ -438,38 +483,90 @@ function renderPhaseSteps(snapshot: DashboardSnapshot): void {
       body.append(detail);
     }
 
-    if ((step.command || step.promptText) && step.state !== "done") {
+    const stepIdx = steps.indexOf(step);
+    const sk = `${snapshot.run?.phase ?? "none"}:${stepIdx}`;
+    const sentEntry = state.sentSteps.get(sk);
+
+    if (sentEntry) {
+      // Show delivery confirmation
+      const result = document.createElement("div");
+      result.className = "step-send-result";
+      const paneStatuses = sentEntry.panes.map(pNum => {
+        const agent = snapshot.agents.find((a: AgentStatus) => a.pane === pNum);
+        const statusClass = agent?.status === "active" ? "step-dot--active"
+          : agent?.status === "stuck" ? "step-dot--stuck" : "step-dot--idle";
+        return `<span class="step-agent-dot ${statusClass}"></span> pane ${pNum}${agent?.type ? ` (${agent.type})` : ""}`;
+      });
+      result.innerHTML = `Delivered to ${sentEntry.panes.join(", ")} · ${formatRelative(sentEntry.deliveredAt)}<br>
+    <span class="step-agent-status">${paneStatuses.join(" &nbsp; ")}</span>`;
+      body.append(result);
+    } else if ((step.promptText || step.command) && step.state !== "done") {
       const actions = document.createElement("div");
       actions.className = "phase-step-actions";
 
+      if (step.promptText) {
+        // Build agent pills
+        const pills = document.createElement("div");
+        pills.className = "agent-pills";
+
+        if (snapshot.agents.length > 0) {
+          // "All" pill
+          const allPill = document.createElement("button");
+          allPill.className = "agent-pill agent-pill--all";
+          allPill.type = "button";
+          allPill.textContent = "All agents";
+          const pt = step.promptText;
+          const sl = step.title;
+          const snap = snapshot;
+          allPill.onclick = async () => {
+            allPill.disabled = true;
+            await sendStepPrompt(snap, pt, sk, sl, "all");
+            allPill.disabled = false;
+          };
+          pills.append(allPill);
+
+          // Per-pane pills
+          for (const agent of snapshot.agents) {
+            const pill = document.createElement("button");
+            const statusClass = agent.status === "active" ? "dot--active"
+              : agent.status === "stuck" ? "dot--stuck" : "dot--idle";
+            pill.className = `agent-pill`;
+            pill.type = "button";
+            pill.innerHTML = `<span class="agent-pill-dot ${statusClass}"></span> pane ${agent.pane}${agent.type ? ` <span class="agent-pill-type">${agent.type}</span>` : ""}`;
+            const ptCopy = step.promptText;
+            const slCopy = step.title;
+            const snapCopy = snapshot;
+            const pane = agent.pane;
+            pill.onclick = async () => {
+              pill.disabled = true;
+              await sendStepPrompt(snapCopy, ptCopy, sk, slCopy, pane);
+              pill.disabled = false;
+            };
+            pills.append(pill);
+          }
+        } else {
+          // No agents — show a note
+          const note = document.createElement("p");
+          note.className = "step-no-agents";
+          note.textContent = "No agents running yet — spawn agents first.";
+          pills.append(note);
+        }
+
+        actions.append(pills);
+      }
+
       if (step.command) {
+        // Keep clipboard copy for shell commands
         const btn = document.createElement("button");
         btn.className = "step-cmd";
-        btn.textContent = step.command;
         btn.type = "button";
+        btn.textContent = step.command;
         const cmd = step.command;
         btn.onclick = () => {
           void navigator.clipboard.writeText(cmd).then(() => {
             btn.classList.add("copied");
             btn.textContent = "Copied!";
             setTimeout(() => { btn.classList.remove("copied"); btn.textContent = cmd; }, 2000);
-          });
-        };
-        actions.append(btn);
-      }
-
-      if (step.promptText) {
-        const btn = document.createElement("button");
-        btn.className = "step-prompt-btn";
-        btn.textContent = step.promptLabel ?? "Copy prompt";
-        btn.type = "button";
-        const text = step.promptText;
-        const label = step.promptLabel ?? "Copy prompt";
-        btn.onclick = () => {
-          void navigator.clipboard.writeText(text).then(() => {
-            btn.classList.add("copied");
-            btn.textContent = "Copied!";
-            setTimeout(() => { btn.classList.remove("copied"); btn.textContent = label; }, 2000);
           });
         };
         actions.append(btn);
@@ -796,6 +893,13 @@ async function postAction(payload: Record<string, unknown>): Promise<{ ok: boole
 
 function applySnapshot(snapshot: DashboardSnapshot) {
   state.snapshot = snapshot;
+
+  // Clear sent-steps tracking when the phase changes
+  const currentPhase = snapshot.run?.phase ?? null;
+  if (currentPhase !== state.lastPhase) {
+    state.sentSteps.clear();
+    state.lastPhase = currentPhase;
+  }
 
   ui.serverMeta.textContent = `Server ${snapshot.server.host}:${snapshot.server.port} · Snapshot ${formatTimestamp(
     snapshot.generatedAt
