@@ -556,6 +556,19 @@ export class FlywheelServer {
   }
 
   private handleRequest(request: IncomingMessage, response: ServerResponse): void {
+    // Allow cross-origin requests from any localhost/loopback origin.
+    // The dashboard may be opened as localhost:4200 while the default server
+    // URL is 127.0.0.1:4200 — browsers treat these as different origins.
+    response.setHeader("access-control-allow-origin", "*");
+    response.setHeader("access-control-allow-methods", "GET, POST, OPTIONS");
+    response.setHeader("access-control-allow-headers", "content-type");
+
+    if (request.method === "OPTIONS") {
+      response.writeHead(204);
+      response.end();
+      return;
+    }
+
     if (request.method === "GET" && request.url === "/health") {
       this.respondJson(response, 200, {
         ok: true,
