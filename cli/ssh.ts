@@ -154,12 +154,20 @@ export class SSHManager {
     const config = loadSSHConfig(this.configPath);
     const client = new NodeSSH();
 
+    // Prefer the SSH agent (SSH_AUTH_SOCK) so passphrase-protected keys work
+    // without storing the passphrase. Fall back to direct key file only when
+    // no agent socket is available.
+    const agentSocket = process.env["SSH_AUTH_SOCK"];
+    const authOptions = agentSocket
+      ? { agent: agentSocket }
+      : { privateKeyPath: config.keyPath };
+
     try {
       await client.connect({
         host: config.host,
         port: config.port,
         username: config.user,
-        privateKeyPath: config.keyPath,
+        ...authOptions,
       });
     } catch (error) {
       client.dispose();
