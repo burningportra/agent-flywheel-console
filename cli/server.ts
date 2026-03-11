@@ -440,12 +440,34 @@ export class FlywheelServer {
   }
 
   private async refreshMail(): Promise<void> {
-    this.updateSnapshot({
-      mail: {
-        available: false,
-        reason: "Agent Mail polling is not wired into cli/server.ts yet.",
-      },
-    });
+    try {
+      // Probe the agent-mail HTTP server running on the VPS at its default port.
+      // Any valid HTTP response (even 4xx/5xx) means the server is up — only a
+      // connection failure or timeout means it's down.
+      const result = await this.remoteRunner.runRemote(
+        "curl -sf --max-time 3 -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/",
+        { silent: true, timeoutMs: 8_000 }
+      );
+
+      const httpCode = result.stdout.trim();
+      const available = /^\d{3}$/.test(httpCode);
+
+      this.updateSnapshot({
+        mail: {
+          available,
+          reason: available
+            ? `http://127.0.0.1:8765 — HTTP ${httpCode}`
+            : "Agent Mail not responding — run: am",
+        },
+      });
+    } catch {
+      this.updateSnapshot({
+        mail: {
+          available: false,
+          reason: "Agent Mail not reachable — is the server running? (run: am)",
+        },
+      });
+    }
   }
 
   private async handleAction(action: DashboardAction): Promise<unknown> {
