@@ -514,9 +514,15 @@ program
   .command("serve")
   .description("Start local dashboard server")
   .option("--port <port>", "Port to bind (use 0 for an OS-assigned free port)", "4200")
-  .action(async (opts: { port: string }) => {
+  .option("--run <run-id>", "Pin to a specific run ID (use `flywheel runs` to list)")
+  .option("--path <remote-path>", "Override the remote project path for bead polling")
+  .option("--session <name>", "Override the NTM session name")
+  .action(async (opts: { port: string; run?: string; path?: string; session?: string }) => {
     const server = createFlywheelServer({
       port: parseServePort(opts.port),
+      runId: opts.run,
+      remoteProjectPath: opts.path,
+      sessionName: opts.session,
     });
     await server.start();
     const boundPort = server.getSnapshot().server.port;

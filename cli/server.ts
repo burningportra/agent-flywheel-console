@@ -526,9 +526,17 @@ export class FlywheelServer {
         shellQuote(resolvedPrompt),
       ].join(" ");
 
-      const result = await this.remoteRunner.runRemote(command, {
-        timeoutMs: 30_000,
-      });
+      let result;
+      try {
+        result = await this.remoteRunner.runRemote(command, {
+          timeoutMs: 30_000,
+        });
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        throw new Error(
+          `${msg}\n\nHint: NTM session "${targetSession}" may not exist yet. Run "flywheel swarm <n>" to spawn agents first.`
+        );
+      }
 
       const promptLabel = action.promptName ?? "step-prompt";
       this.stateManager.logPromptSend(promptLabel, target, this.resolveRunId());

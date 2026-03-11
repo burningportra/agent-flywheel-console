@@ -648,10 +648,11 @@ function bindEvents() {
     if (!ui.promptAll.checked) {
       const pane = Number.parseInt(ui.promptPane.value.trim(), 10);
       if (!Number.isInteger(pane) || pane <= 0) {
-        logAction("Target pane must be a positive integer, or choose broadcast.", true);
-        return;
+        // No pane entered and broadcast not checked — auto-broadcast.
+        payload["all"] = true;
+      } else {
+        payload["pane"] = pane;
       }
-      payload["pane"] = pane;
     }
 
     const parsed = parseVariables(ui.promptVars.value);
