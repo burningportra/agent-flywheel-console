@@ -46,39 +46,44 @@
 
       <!-- ── Command center ─────────────────────────────────────── -->
       <section class="command-center card card-accent">
-        <div class="command-left">
-          <div class="command-guidance">
-            <p class="section-kicker">What to do now</p>
-            <h2 id="guidance-title">Loading…</h2>
-            <p id="guidance-detail" class="guidance-detail">Waiting for snapshot.</p>
+
+        <!-- Phase rail -->
+        <div id="workflow-rail" class="workflow-rail-cc"></div>
+
+        <!-- Phase steps (rendered by renderPhaseSteps) -->
+        <div id="phase-steps" class="phase-steps"></div>
+
+        <!-- Bead progress bar (shown during swarm) -->
+        <div class="bead-progress hidden" id="bead-progress">
+          <div class="bead-progress-track">
+            <div class="bead-progress-fill" id="bead-progress-fill"></div>
           </div>
-          <div class="bead-progress hidden" id="bead-progress">
-            <div class="bead-progress-track">
-              <div class="bead-progress-fill" id="bead-progress-fill"></div>
-            </div>
-            <p class="bead-progress-label" id="bead-progress-label"></p>
-          </div>
+          <p class="bead-progress-label" id="bead-progress-label"></p>
         </div>
-        <div class="command-right">
-          <div class="primary-action hidden" id="primary-action">
-            <p class="section-kicker">Advance gate</p>
-            <form id="gate-form" class="gate-form-inline">
-              <select id="gate-phase" class="gate-select">
-                <option value="beads">beads</option>
-                <option value="swarm">swarm</option>
-                <option value="review">review</option>
-                <option value="deploy">deploy</option>
-              </select>
-              <input id="gate-checkpoint" type="text" placeholder="SHA (optional)" class="gate-sha" />
-              <button id="gate-submit" class="button button-primary gate-cta" type="submit">Advance →</button>
-            </form>
-            <p id="gate-note" class="microcopy">Waiting for run context…</p>
-          </div>
-          <div class="no-action-hint" id="no-action-hint">
-            <p class="section-kicker">Gate advance</p>
-            <p class="microcopy" id="gate-note-disabled">Complete the current phase to advance.</p>
-          </div>
+
+        <!-- Gate advance form (injected as a step action when gate is enabled) -->
+        <div class="gate-step hidden" id="primary-action">
+          <form id="gate-form" class="gate-form-inline">
+            <select id="gate-phase" class="gate-select">
+              <option value="beads">beads</option>
+              <option value="swarm">swarm</option>
+              <option value="review">review</option>
+              <option value="deploy">deploy</option>
+            </select>
+            <input id="gate-checkpoint" type="text" placeholder="SHA (optional)" class="gate-sha" />
+            <button id="gate-submit" class="button button-primary gate-cta" type="submit">Advance gate →</button>
+          </form>
+          <p id="gate-note" class="microcopy">Waiting for run context…</p>
         </div>
+
+        <!-- Hidden compat elements for Playwright / existing JS -->
+        <div class="sr-only" aria-hidden="true">
+          <h2 id="guidance-title"></h2>
+          <p id="guidance-detail"></p>
+          <span id="run-badge"></span>
+          <div id="no-action-hint"><p id="gate-note-disabled"></p></div>
+        </div>
+
       </section>
 
       <!-- ── Error banner ───────────────────────────────────────── -->

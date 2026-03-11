@@ -93,7 +93,219 @@ const ui = {
   primaryAction: requireElement("#primary-action") as HTMLElement,
   noActionHint: requireElement("#no-action-hint") as HTMLElement,
   gateNoteDisabled: requireElement("#gate-note-disabled") as HTMLElement,
+  phaseSteps: requireElement("#phase-steps") as HTMLElement,
 };
+
+// ── Prompt constants for phase steps ────────────────────────────────────────
+
+const P_COMBINE_PLANS = `I asked 3 competing LLMs to do the exact same thing and they came up with pretty different plans which you can read below. I want you to REALLY carefully analyze their plans with an open mind and be intellectually honest about what they did that's better than your plan. Then I want you to come up with the best possible revisions to your plan (you should simply update your existing document for your original plan with the revisions) that artfully and skillfully blends the "best of all worlds" to create a true, ultimate, superior hybrid version of the plan that best achieves our stated goals and will work the best in real-world practice to solve the problems we are facing and our overarching goals while ensuring the extreme success of the enterprise as best as possible; you should provide me with a complete series of git-diff style changes to your original plan to turn it into the new, enhanced, much longer and detailed plan that integrates the best of all the plans with every good idea included:`;
+
+const P_100_IDEAS = `OK so now I want you to come up with your top 10 most brilliant ideas for adding extremely powerful and cool functionality that will make this system far more compelling, useful, intuitive, versatile, powerful, robust, reliable, etc for the users. Use /effort max. But be pragmatic and don't think of features that will be extremely hard to implement or which aren't necessarily worth the additional complexity burden they would introduce. But I don't want you to just think of 10 ideas: I want you to seriously think hard and come up with one HUNDRED ideas and then only tell me your 10 VERY BEST and most brilliant, clever, and radically innovative and powerful ideas.`;
+
+const P_CREATE_BEADS = `OK so please take ALL of that and elaborate on it more and then create a comprehensive and granular set of beads for all this with tasks, subtasks, and dependency structure overlaid, with detailed comments so that the whole thing is totally self-contained and self-documenting (including relevant background, reasoning/justification, considerations, etc.-- anything we'd want our "future self" to know about the goals and intentions and thought process and how it serves the over-arching goals of the project.) Use the \`br\` tool repeatedly to create the actual beads. Use /effort max.`;
+
+const P_IMPROVE_BEADS = `Check over each bead super carefully-- are you sure it makes sense? Is it optimal? Could we change anything to make the system work better for users? If so, revise the beads. It's a lot easier and faster to operate in "plan space" before we start implementing these things! Use /effort max.`;
+
+const P_NEW_AGENT = `First read ALL of the AGENTS.md file and README.md file super carefully and understand ALL of both! Then use your code investigation agent mode to fully understand the code, and technical architecture and purpose of the project. Then register with MCP Agent Mail and introduce yourself to the other agents. Be sure to check your agent mail and to promptly respond if needed to any messages; then proceed meticulously with your next assigned beads, working on the tasks systematically and meticulously and tracking your progress via beads and agent mail messages. Don't get stuck in "communication purgatory" where nothing is getting done; be proactive about starting tasks that need to be done, but inform your fellow agents via messages when you do so and mark beads appropriately. When you're not sure what to do next, use the bv tool mentioned in AGENTS.md to prioritize the best beads to work on next; pick the next one that you can usefully work on and get started. Make sure to acknowledge all communication requests from other agents and that you are aware of all active agents and their names. Use /effort max.`;
+
+const P_CHECK_MAIL = `Be sure to check your agent mail and to promptly respond if needed to any messages, and also acknowledge any contact requests; make sure you know the names of all active agents using the MCP Agent Mail system.`;
+
+const P_NEXT_BEAD = `Pick the next bead you can actually do usefully now and start coding on it immediately; communicate what you're working on to your fellow agents and mark beads appropriately as you work. And respond to any agent mail messages you've received.`;
+
+const P_FRESH_REVIEW = `Great, now I want you to carefully read over all of the new code you just wrote and other existing code you just modified with "fresh eyes" looking super carefully for any obvious bugs, errors, problems, issues, confusion, etc. Carefully fix anything you uncover.`;
+
+const P_PEER_REVIEW = `Ok can you now turn your attention to reviewing the code written by your fellow agents and checking for any issues, bugs, errors, problems, inefficiencies, security problems, reliability issues, etc. and carefully diagnose their underlying root causes using first-principle analysis and then fix or revise them if necessary? Don't restrict yourself to the latest commits, cast a wider net and go super deep! Use /effort max.`;
+
+const P_SCRUTINIZE_UI = `Great, now I want you to super carefully scrutinize every aspect of the application workflow and implementation and look for things that just seem sub-optimal or even wrong/mistaken to you, things that could very obviously be improved from a user-friendliness and intuitiveness standpoint, places where our UI/UX could be improved and polished to be slicker, more visually appealing, and more premium feeling and just ultra high quality, like Stripe-level apps.`;
+
+const P_APPLY_UBS = `Read about the ubs tool in AGENTS.md. Now run UBS and investigate and fix literally every single UBS issue once you determine (after reasoned consideration and close inspection) that it's legit.`;
+
+const P_GIT_COMMIT = `Now, based on your knowledge of the project, commit all changed files now in a series of logically connected groupings with super detailed commit messages for each and then push. Take your time to do it right. Don't edit the code at all. Don't commit obviously ephemeral files. Use /effort max.`;
+
+const P_GH_FLOW = `Do all the GitHub stuff: commit, deploy, create tag, bump version, release, monitor gh actions, compute checksums, etc.`;
+
+// ── Phase step types & renderer ─────────────────────────────────────────────
+
+interface PhaseStep {
+  title: string;
+  detail?: string;
+  command?: string;
+  promptText?: string;
+  promptLabel?: string;
+  state: "done" | "current" | "upcoming";
+}
+
+function getPhaseSteps(snapshot: DashboardSnapshot): PhaseStep[] {
+  const phase = snapshot.run?.phase;
+  const agents = snapshot.agents;
+  const beads = snapshot.beads;
+  const gateEnabled = snapshot.actionStates["gate.advance"]?.enabled ?? false;
+  const hasAgents = agents.length > 0;
+
+  if (!snapshot.run) {
+    return [
+      { title: "Configure SSH connection", detail: "Point the console at your VPS", command: "flywheel settings ssh", state: "current" },
+      { title: "Start a new project", detail: "Launch the multi-model planning wizard", command: 'flywheel new "your idea"', state: "upcoming" },
+    ];
+  }
+
+  if (phase === "plan") {
+    return [
+      { title: "Get competing plans from 3 models", detail: "Ask ChatGPT, Claude Opus, and Gemini for plans on your idea — each has different strengths", state: "current" },
+      { title: "Synthesize the best of all worlds", detail: "Paste all three plans back into your primary AI", promptText: P_COMBINE_PLANS, promptLabel: "Copy combine_plans", state: "upcoming" },
+      { title: "Generate top 10 brilliant ideas", detail: "Think of 100, surface the best 10 — repeat 3× for compounding", promptText: P_100_IDEAS, promptLabel: "Copy 100_ideas", state: "upcoming" },
+      { title: "Run the planning wizard", command: 'flywheel new "your idea"', state: "upcoming" },
+      { title: "Advance gate to Beads", detail: gateEnabled ? "Plan looks good — advance when ready" : "Complete planning, then advance", state: gateEnabled ? "current" : "upcoming" },
+    ];
+  }
+
+  if (phase === "beads") {
+    return [
+      { title: "Generate beads from plan", detail: "Create a granular, self-documenting task graph", promptText: P_CREATE_BEADS, promptLabel: "Copy create_beads", state: "current" },
+      { title: "Review and refine beads", detail: "Iterate in plan space — much cheaper than code space", promptText: P_IMPROVE_BEADS, promptLabel: "Copy improve_beads", state: "upcoming" },
+      { title: "Analyze with Beads Viewer", command: "bv --robot-triage", state: "upcoming" },
+      { title: "Advance gate to Swarm", detail: gateEnabled ? "Beads look good — advance when ready" : "Finalize beads, then advance", state: gateEnabled ? "current" : "upcoming" },
+    ];
+  }
+
+  if (phase === "swarm") {
+    const stuck = agents.filter((a) => a.status === "stuck");
+    const beadsDone = beads && beads.open === 0 && beads.inProgress === 0 && beads.closed > 0;
+    const etaPart = beads && typeof beads.etaHours === "number" && beads.etaHours > 0
+      ? ` · ETA ${beads.etaHours < 1 ? `${Math.round(beads.etaHours * 60)}m` : `${beads.etaHours.toFixed(1)}h`}`
+      : "";
+
+    return [
+      {
+        title: "Spawn agents via NTM (tmux)",
+        detail: hasAgents ? `${hasAgents ? agents.length : "?"} agents running` : "No agents detected yet",
+        command: "flywheel swarm 6",
+        state: hasAgents ? "done" : "current",
+      },
+      {
+        title: "Initialize each agent",
+        detail: "Paste to each pane — agents will read AGENTS.md, register with Mail, and start beads",
+        promptText: P_NEW_AGENT,
+        promptLabel: "Copy new_agent prompt",
+        state: hasAgents ? "done" : "upcoming",
+      },
+      {
+        title: stuck.length > 0
+          ? `Unblock ${stuck.length} stuck agent${stuck.length === 1 ? "" : "s"}`
+          : beadsDone
+            ? "All beads closed ✓"
+            : `Monitor progress${beads ? ` · ${beads.closed}/${beads.total} beads${etaPart}` : ""}`,
+        detail: stuck.length > 0
+          ? `Pane${stuck.length === 1 ? "" : "s"} ${stuck.map((a) => a.pane).join(", ")} stuck — send a prompt or check mail`
+          : beads?.topRecommendation
+            ? `Top pick: ${beads.topRecommendation.id} — ${beads.topRecommendation.title}`
+            : undefined,
+        promptText: stuck.length > 0 ? P_CHECK_MAIL : P_NEXT_BEAD,
+        promptLabel: stuck.length > 0 ? "Copy check_mail" : "Copy next_bead",
+        state: hasAgents ? "current" : "upcoming",
+      },
+      {
+        title: "Advance gate to Review",
+        detail: beadsDone ? "All beads closed — advance when ready" : "Available when all beads are closed",
+        state: beadsDone && gateEnabled ? "current" : "upcoming",
+      },
+    ];
+  }
+
+  if (phase === "review") {
+    return [
+      { title: hasAgents ? "Run fresh review" : "Spawn review agents", command: hasAgents ? undefined : "flywheel swarm 3", promptText: hasAgents ? P_FRESH_REVIEW : undefined, promptLabel: hasAgents ? "Copy fresh_review" : undefined, detail: hasAgents ? undefined : "Re-use the swarm or spawn a smaller review crew", state: "current" },
+      { title: "Peer review — other agents' code", promptText: P_PEER_REVIEW, promptLabel: "Copy check_other_agents", state: "upcoming" },
+      { title: "UI/UX scrutiny — Stripe-level polish", promptText: P_SCRUTINIZE_UI, promptLabel: "Copy scrutinize_ui", state: "upcoming" },
+      { title: "UBS bug scan", promptText: P_APPLY_UBS, promptLabel: "Copy apply_ubs", state: "upcoming" },
+      { title: "Advance gate to Deploy", detail: gateEnabled ? "Review complete — advance when satisfied" : "Complete review passes, then advance", state: gateEnabled ? "current" : "upcoming" },
+    ];
+  }
+
+  if (phase === "deploy") {
+    return [
+      { title: "Commit in logical groups", promptText: P_GIT_COMMIT, promptLabel: "Copy git_commit", state: "current" },
+      { title: "Full GitHub flow", detail: "Tag, version bump, release, monitor Actions", promptText: P_GH_FLOW, promptLabel: "Copy gh_flow", state: "upcoming" },
+      { title: "Deploy", detail: "Requires typing DEPLOY <project-name> to confirm", command: "flywheel deploy", state: "upcoming" },
+    ];
+  }
+
+  return [];
+}
+
+function renderPhaseSteps(snapshot: DashboardSnapshot): void {
+  const steps = getPhaseSteps(snapshot);
+  const fragment = document.createDocumentFragment();
+
+  for (const step of steps) {
+    const el = document.createElement("div");
+    el.className = `phase-step phase-step--${step.state}`;
+
+    const badge = document.createElement("div");
+    badge.className = "phase-step-badge";
+    badge.textContent = step.state === "done" ? "✓" : step.state === "current" ? "▶" : String(steps.indexOf(step) + 1);
+
+    const body = document.createElement("div");
+    body.className = "phase-step-body";
+
+    const title = document.createElement("div");
+    title.className = "phase-step-title";
+    title.textContent = step.title;
+    body.append(title);
+
+    if (step.detail) {
+      const detail = document.createElement("div");
+      detail.className = "phase-step-detail";
+      detail.textContent = step.detail;
+      body.append(detail);
+    }
+
+    if ((step.command || step.promptText) && step.state !== "done") {
+      const actions = document.createElement("div");
+      actions.className = "phase-step-actions";
+
+      if (step.command) {
+        const btn = document.createElement("button");
+        btn.className = "step-cmd";
+        btn.textContent = step.command;
+        btn.type = "button";
+        const cmd = step.command;
+        btn.onclick = () => {
+          void navigator.clipboard.writeText(cmd).then(() => {
+            btn.classList.add("copied");
+            btn.textContent = "Copied!";
+            setTimeout(() => { btn.classList.remove("copied"); btn.textContent = cmd; }, 2000);
+          });
+        };
+        actions.append(btn);
+      }
+
+      if (step.promptText) {
+        const btn = document.createElement("button");
+        btn.className = "step-prompt-btn";
+        btn.textContent = step.promptLabel ?? "Copy prompt";
+        btn.type = "button";
+        const text = step.promptText;
+        const label = step.promptLabel ?? "Copy prompt";
+        btn.onclick = () => {
+          void navigator.clipboard.writeText(text).then(() => {
+            btn.classList.add("copied");
+            btn.textContent = "Copied!";
+            setTimeout(() => { btn.classList.remove("copied"); btn.textContent = label; }, 2000);
+          });
+        };
+        actions.append(btn);
+      }
+
+      body.append(actions);
+    }
+
+    el.append(badge, body);
+    fragment.append(el);
+  }
+
+  ui.phaseSteps.replaceChildren(fragment);
+}
 
 initialize();
 
@@ -435,6 +647,7 @@ function applySnapshot(snapshot: DashboardSnapshot) {
   ui.metricPrompts.textContent = String(snapshot.prompts.length);
   ui.metricSession.textContent = `Session ${snapshot.server.sessionName}`;
   renderMemoryPanel(snapshot);
+  renderPhaseSteps(snapshot);
   renderBeadProgress(snapshot.beads, snapshot.run?.phase);
 
   if (snapshot.beads) {

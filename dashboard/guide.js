@@ -1,3 +1,4 @@
+// @ts-nocheck
 // Copy to clipboard helper
 function copyText(text, btn) {
   const original = btn.textContent;
