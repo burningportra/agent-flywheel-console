@@ -13,6 +13,7 @@
     "build:dashboard": "vite build dashboard",
     "serve": "tsx cli/index.ts serve",
     "typecheck": "tsc --noEmit",
+    "typecheck:dashboard": "tsc --project dashboard/tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",

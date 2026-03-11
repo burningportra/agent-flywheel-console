@@ -5,7 +5,7 @@ import {
 } from "./remote.js";
 import { shellQuote } from "./utils.js";
 
-type AgentRuntimeType = "claude" | "codex" | "gemini" | "user" | "unknown";
+export type AgentRuntimeType = "claude" | "codex" | "gemini" | "user" | "unknown";
 
 interface NtmListResponse {
   sessions?: Array<{

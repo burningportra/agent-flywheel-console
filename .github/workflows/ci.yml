@@ -28,6 +28,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
+      - run: npm run typecheck:dashboard
       - run: npm run build
       - run: npm run build:dashboard
       - name: Upload build artifacts

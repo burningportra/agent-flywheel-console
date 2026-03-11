@@ -20,7 +20,7 @@ const BEAD_POLL_MS = 20_000;
 const VPS_HEALTH_POLL_MS = 45_000;
 const MAIL_POLL_MS = 10_000;
 
-type ActionName = "prompt.send" | "swarm.pause" | "swarm.resume" | "gate.advance";
+export type ActionName = "prompt.send" | "swarm.pause" | "swarm.resume" | "gate.advance";
 
 interface FlywheelServerOptions {
   host?: string;
@@ -35,7 +35,7 @@ interface FlywheelServerOptions {
   promptVariables?: Record<string, string>;
 }
 
-interface BeadSummary {
+export interface BeadSummary {
   total: number;
   open: number;
   inProgress: number;
@@ -50,30 +50,36 @@ interface BeadSummary {
   };
 }
 
-interface PromptSummary {
+export interface PromptSummary {
   name: string;
   phase: string;
   model: string;
   effort: string;
 }
 
-interface VpsHealth {
+export interface VpsHealth {
   uptime: string;
   memory: string;
   disk: string;
 }
 
-interface MailStatus {
+export interface MailStatus {
   available: boolean;
   reason?: string;
 }
 
-interface ActionState {
+export interface CostSummary {
+  totalCostUsd: number;
+  byModel: Record<string, number>;
+  byPhase: Record<string, number>;
+}
+
+export interface ActionState {
   enabled: boolean;
   reason?: string;
 }
 
-interface RunSummary {
+export interface RunSummary {
   id: string;
   projectName: string;
   phase: Phase;
@@ -82,12 +88,12 @@ interface RunSummary {
   checkpointSha: string | null;
 }
 
-interface WorkflowGuidance {
+export interface WorkflowGuidance {
   title: string;
   detail: string;
 }
 
-interface DashboardSnapshot {
+export interface DashboardSnapshot {
   generatedAt: string;
   server: {
     host: string;
@@ -111,7 +117,7 @@ interface DashboardSnapshot {
   lastError?: string;
 }
 
-type DashboardAction =
+export type DashboardAction =
   | {
       type: "prompt.send";
       promptName: string;
@@ -556,13 +562,19 @@ export class FlywheelServer {
       return;
     }
 
-    if (request.method === "GET" && request.url === "/main.js") {
-      void this.respondDashboardAsset(response, "main.js", "application/javascript; charset=utf-8");
+    if (request.method === "GET" && (request.url === "/main.js" || request.url === "/main.ts")) {
+      const assetName = request.url === "/main.ts" ? "main.ts" : "main.js";
+      void this.respondDashboardAsset(response, assetName, "application/javascript; charset=utf-8");
       return;
     }
 
     if (request.method === "GET" && request.url === "/style.css") {
       void this.respondDashboardAsset(response, "style.css", "text/css; charset=utf-8");
+      return;
+    }
+
+    if (request.method === "GET" && request.url === "/cost") {
+      this.respondJson(response, 200, this.getCostSummary());
       return;
     }
 
@@ -661,6 +673,24 @@ export class FlywheelServer {
         },
       },
     };
+  }
+
+  private getCostSummary(): CostSummary {
+    const runId = this.resolveRunId();
+    if (!runId) {
+      return { totalCostUsd: 0, byModel: {}, byPhase: {} };
+    }
+    const calls = this.stateManager.getApiCalls(runId);
+    const byModel: Record<string, number> = {};
+    const byPhase: Record<string, number> = {};
+    let totalCostUsd = 0;
+    for (const call of calls) {
+      const cost = call.cost_usd ?? 0;
+      totalCostUsd += cost;
+      byModel[call.model] = (byModel[call.model] ?? 0) + cost;
+      byPhase[call.phase] = (byPhase[call.phase] ?? 0) + cost;
+    }
+    return { totalCostUsd, byModel, byPhase };
   }
 
   private getLatestRun(): FlywheelRun | undefined {

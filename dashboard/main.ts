@@ -1,14 +1,33 @@
+import type {
+  AgentStatus,
+  BeadSummary,
+  CostSummary,
+  DashboardSnapshot,
+  MailStatus,
+  Phase,
+  PromptSummary,
+  RunSummary,
+  VpsHealth,
+} from "./types.js";
+
 const STORAGE_SERVER_URL = "flywheel.dashboard.server-url";
 const PHASES = ["plan", "beads", "swarm", "review", "deploy"];
 const ACTION_ORDER = ["prompt.send", "swarm.pause", "swarm.resume", "gate.advance"];
-const ACTION_LABELS = {
+const ACTION_LABELS: Record<string, string> = {
   "prompt.send": "Prompt send",
   "swarm.pause": "Swarm pause",
   "swarm.resume": "Swarm resume",
   "gate.advance": "Gate advance",
 };
 
-const state = {
+const state: {
+  snapshot: DashboardSnapshot | null;
+  socket: WebSocket | null;
+  reconnectTimer: ReturnType<typeof setTimeout> | null;
+  reconnectDelayMs: number;
+  reconnectMessageShown: boolean;
+  promptCatalog: Map<string, PromptSummary>;
+} = {
   snapshot: null,
   socket: null,
   reconnectTimer: null,
@@ -18,55 +37,56 @@ const state = {
 };
 
 const ui = {
-  serverUrl: requireElement("#server-url"),
-  wsStatus: requireElement("#ws-status"),
-  reconnectButton: requireElement("#reconnect-button"),
-  refreshButton: requireElement("#refresh-button"),
-  serverMeta: requireElement("#server-meta"),
-  runBadge: requireElement("#run-badge"),
-  guidanceTitle: requireElement("#guidance-title"),
-  guidanceDetail: requireElement("#guidance-detail"),
-  workflowRail: requireElement("#workflow-rail"),
-  metricRun: requireElement("#metric-run"),
-  metricProject: requireElement("#metric-project"),
-  metricPhase: requireElement("#metric-phase"),
-  metricPhaseMeta: requireElement("#metric-phase-meta"),
-  metricSsh: requireElement("#metric-ssh"),
-  metricHost: requireElement("#metric-host"),
-  metricAgents: requireElement("#metric-agents"),
-  metricAgentBreakdown: requireElement("#metric-agent-breakdown"),
-  metricBeads: requireElement("#metric-beads"),
-  metricTopPick: requireElement("#metric-top-pick"),
-  metricVelocity: requireElement("#metric-velocity"),
-  metricPrompts: requireElement("#metric-prompts"),
-  metricSession: requireElement("#metric-session"),
-  errorBanner: requireElement("#error-banner"),
-  agentsUpdated: requireElement("#agents-updated"),
-  agentList: requireElement("#agent-list"),
-  beadSummary: requireElement("#bead-summary"),
-  actionAvailability: requireElement("#action-availability"),
-  promptLibraryMeta: requireElement("#prompt-library-meta"),
-  promptLibrary: requireElement("#prompt-library"),
-  vpsHealth: requireElement("#vps-health"),
-  mailStatus: requireElement("#mail-status"),
-  actionLog: requireElement("#action-log"),
-  promptForm: requireElement("#prompt-form"),
-  promptName: requireElement("#prompt-name"),
-  promptOptions: requireElement("#prompt-options"),
-  promptPane: requireElement("#prompt-pane"),
-  promptAll: requireElement("#prompt-all"),
-  promptVars: requireElement("#prompt-vars"),
-  promptMeta: requireElement("#prompt-meta"),
-  promptSubmit: requireElement("#prompt-submit"),
-  sessionSummary: requireElement("#session-summary"),
-  pauseButton: requireElement("#pause-button"),
-  resumeButton: requireElement("#resume-button"),
-  swarmControlsNote: requireElement("#swarm-controls-note"),
-  gateForm: requireElement("#gate-form"),
-  gatePhase: requireElement("#gate-phase"),
-  gateCheckpoint: requireElement("#gate-checkpoint"),
-  gateSubmit: requireElement("#gate-submit"),
-  gateNote: requireElement("#gate-note"),
+  serverUrl: requireElement("#server-url") as HTMLInputElement,
+  wsStatus: requireElement("#ws-status") as HTMLElement,
+  reconnectButton: requireElement("#reconnect-button") as HTMLButtonElement,
+  refreshButton: requireElement("#refresh-button") as HTMLButtonElement,
+  serverMeta: requireElement("#server-meta") as HTMLElement,
+  runBadge: requireElement("#run-badge") as HTMLElement,
+  guidanceTitle: requireElement("#guidance-title") as HTMLElement,
+  guidanceDetail: requireElement("#guidance-detail") as HTMLElement,
+  workflowRail: requireElement("#workflow-rail") as HTMLElement,
+  metricRun: requireElement("#metric-run") as HTMLElement,
+  metricProject: requireElement("#metric-project") as HTMLElement,
+  metricPhase: requireElement("#metric-phase") as HTMLElement,
+  metricPhaseMeta: requireElement("#metric-phase-meta") as HTMLElement,
+  metricSsh: requireElement("#metric-ssh") as HTMLElement,
+  metricHost: requireElement("#metric-host") as HTMLElement,
+  metricAgents: requireElement("#metric-agents") as HTMLElement,
+  metricAgentBreakdown: requireElement("#metric-agent-breakdown") as HTMLElement,
+  metricBeads: requireElement("#metric-beads") as HTMLElement,
+  metricTopPick: requireElement("#metric-top-pick") as HTMLElement,
+  metricVelocity: requireElement("#metric-velocity") as HTMLElement,
+  metricPrompts: requireElement("#metric-prompts") as HTMLElement,
+  metricSession: requireElement("#metric-session") as HTMLElement,
+  errorBanner: requireElement("#error-banner") as HTMLElement,
+  agentsUpdated: requireElement("#agents-updated") as HTMLElement,
+  agentList: requireElement("#agent-list") as HTMLElement,
+  beadSummary: requireElement("#bead-summary") as HTMLElement,
+  actionAvailability: requireElement("#action-availability") as HTMLElement,
+  promptLibraryMeta: requireElement("#prompt-library-meta") as HTMLElement,
+  promptLibrary: requireElement("#prompt-library") as HTMLElement,
+  vpsHealth: requireElement("#vps-health") as HTMLElement,
+  mailStatus: requireElement("#mail-status") as HTMLElement,
+  costPanel: requireElement("#cost-panel") as HTMLElement,
+  actionLog: requireElement("#action-log") as HTMLElement,
+  promptForm: requireElement("#prompt-form") as HTMLFormElement,
+  promptName: requireElement("#prompt-name") as HTMLInputElement,
+  promptOptions: requireElement("#prompt-options") as HTMLElement,
+  promptPane: requireElement("#prompt-pane") as HTMLInputElement,
+  promptAll: requireElement("#prompt-all") as HTMLInputElement,
+  promptVars: requireElement("#prompt-vars") as HTMLTextAreaElement,
+  promptMeta: requireElement("#prompt-meta") as HTMLElement,
+  promptSubmit: requireElement("#prompt-submit") as HTMLButtonElement,
+  sessionSummary: requireElement("#session-summary") as HTMLElement,
+  pauseButton: requireElement("#pause-button") as HTMLButtonElement,
+  resumeButton: requireElement("#resume-button") as HTMLButtonElement,
+  swarmControlsNote: requireElement("#swarm-controls-note") as HTMLElement,
+  gateForm: requireElement("#gate-form") as HTMLFormElement,
+  gatePhase: requireElement("#gate-phase") as HTMLSelectElement,
+  gateCheckpoint: requireElement("#gate-checkpoint") as HTMLInputElement,
+  gateSubmit: requireElement("#gate-submit") as HTMLButtonElement,
+  gateNote: requireElement("#gate-note") as HTMLElement,
 };
 
 initialize();
@@ -122,11 +142,11 @@ function bindEvents() {
     }
 
     if (state.promptCatalog.size > 0 && !state.promptCatalog.has(promptName)) {
-      logAction(`Unknown prompt \"${promptName}\". Pick one from the prompt library.`, true);
+      logAction(`Unknown prompt "${promptName}". Pick one from the prompt library.`, true);
       return;
     }
 
-    const payload = {
+    const payload: Record<string, unknown> = {
       type: "prompt.send",
       promptName,
       all: ui.promptAll.checked,
@@ -138,7 +158,7 @@ function bindEvents() {
         logAction("Target pane must be a positive integer, or choose broadcast.", true);
         return;
       }
-      payload.pane = pane;
+      payload["pane"] = pane;
     }
 
     const parsed = parseVariables(ui.promptVars.value);
@@ -151,7 +171,7 @@ function bindEvents() {
     }
 
     if (Object.keys(parsed.variables).length > 0) {
-      payload.variables = parsed.variables;
+      payload["variables"] = parsed.variables;
     }
 
     void runAction(payload, ui.promptSubmit);
@@ -174,14 +194,14 @@ function bindEvents() {
       return;
     }
 
-    const payload = {
+    const payload: Record<string, unknown> = {
       type: "gate.advance",
       nextPhase,
     };
 
     const checkpointSha = ui.gateCheckpoint.value.trim();
     if (checkpointSha) {
-      payload.checkpointSha = checkpointSha;
+      payload["checkpointSha"] = checkpointSha;
     }
 
     void runAction(payload, ui.gateSubmit);
@@ -193,7 +213,7 @@ function bindEvents() {
       return;
     }
 
-    ui.promptName.value = target.dataset.promptName ?? "";
+    ui.promptName.value = target.dataset["promptName"] ?? "";
     updatePromptMeta();
   };
 }
@@ -219,7 +239,7 @@ async function fetchSnapshot() {
     }
 
     const snapshot = await response.json();
-    applySnapshot(snapshot);
+    applySnapshot(snapshot as DashboardSnapshot);
   } catch (error) {
     logAction(`Snapshot fetch failed: ${describeError(error)}`, true);
   }
@@ -251,16 +271,16 @@ async function connect() {
     };
 
     socket.onmessage = (event) => {
-      let data;
+      let data: { type: string; payload?: unknown; ok?: boolean; action?: string; error?: string };
       try {
-        data = JSON.parse(event.data);
+        data = JSON.parse(event.data as string) as typeof data;
       } catch {
         logAction("Received malformed WebSocket payload.", true);
         return;
       }
 
       if (data.type === "snapshot") {
-        applySnapshot(data.payload);
+        applySnapshot(data.payload as DashboardSnapshot);
         return;
       }
 
@@ -314,7 +334,7 @@ function clearReconnectTimer() {
   }
 }
 
-async function runAction(payload, triggerButton) {
+async function runAction(payload: Record<string, unknown>, triggerButton: HTMLButtonElement | null) {
   if (triggerButton) {
     triggerButton.disabled = true;
     triggerButton.classList.add("is-busy");
@@ -323,14 +343,14 @@ async function runAction(payload, triggerButton) {
   try {
     const result = await postAction(payload);
     if (result.ok) {
-      logAction(`Action ${payload.type} succeeded`);
+      logAction(`Action ${payload["type"]} succeeded`);
       await fetchSnapshot();
       return;
     }
 
-    logAction(`Action ${payload.type} failed: ${result.error ?? "unknown error"}`, true);
+    logAction(`Action ${payload["type"]} failed: ${result.error ?? "unknown error"}`, true);
   } catch (error) {
-    logAction(`Action ${payload.type} failed: ${describeError(error)}`, true);
+    logAction(`Action ${payload["type"]} failed: ${describeError(error)}`, true);
   } finally {
     if (triggerButton) {
       triggerButton.classList.remove("is-busy");
@@ -344,7 +364,7 @@ async function runAction(payload, triggerButton) {
   }
 }
 
-async function postAction(payload) {
+async function postAction(payload: Record<string, unknown>): Promise<{ ok: boolean; action?: string; error?: string }> {
   const baseUrl = normalizedBaseUrl();
   try {
     const response = await fetch(`${baseUrl}/action`, {
@@ -355,9 +375,9 @@ async function postAction(payload) {
       body: JSON.stringify(payload),
     });
 
-    let data;
+    let data: { ok: boolean; action?: string; error?: string };
     try {
-      data = await response.json();
+      data = await response.json() as typeof data;
     } catch {
       data = { ok: false, error: `${response.status} ${response.statusText}` };
     }
@@ -378,7 +398,7 @@ async function postAction(payload) {
   }
 }
 
-function applySnapshot(snapshot) {
+function applySnapshot(snapshot: DashboardSnapshot) {
   state.snapshot = snapshot;
 
   ui.serverMeta.textContent = `Server ${snapshot.server.host}:${snapshot.server.port} · Snapshot ${formatTimestamp(
@@ -408,7 +428,7 @@ function applySnapshot(snapshot) {
 
   ui.metricPrompts.textContent = String(snapshot.prompts.length);
   ui.metricSession.textContent = `Session ${snapshot.server.sessionName}`;
-  ui.sessionSummary.textContent = snapshot.server.sessionName;
+  renderMemoryPanel(snapshot);
 
   if (snapshot.beads) {
     ui.metricBeads.textContent = `${snapshot.beads.closed}/${snapshot.beads.total}`;
@@ -438,9 +458,10 @@ function applySnapshot(snapshot) {
   ui.agentsUpdated.textContent = `Updated ${formatTimestamp(snapshot.generatedAt)}`;
 
   syncControls(snapshot);
+  void fetchCost();
 }
 
-function applyGuidance(snapshot) {
+function applyGuidance(snapshot: DashboardSnapshot) {
   ui.guidanceTitle.textContent = snapshot.guidance.title;
   ui.guidanceDetail.textContent = snapshot.guidance.detail;
 
@@ -466,7 +487,7 @@ function applyGuidance(snapshot) {
   ui.runBadge.className = "status-pill status-live";
 }
 
-function renderError(lastError) {
+function renderError(lastError: string | undefined) {
   if (!lastError) {
     ui.errorBanner.classList.add("hidden");
     ui.errorBanner.textContent = "";
@@ -477,7 +498,7 @@ function renderError(lastError) {
   ui.errorBanner.textContent = `Latest server error: ${lastError}`;
 }
 
-function renderWorkflowRail(currentPhase) {
+function renderWorkflowRail(currentPhase: Phase | undefined) {
   const currentIndex = currentPhase ? PHASES.indexOf(currentPhase) : -1;
   const fragment = document.createDocumentFragment();
 
@@ -498,7 +519,7 @@ function renderWorkflowRail(currentPhase) {
   ui.workflowRail.replaceChildren(fragment);
 }
 
-function renderAgents(agents) {
+function renderAgents(agents: AgentStatus[]) {
   if (!agents.length) {
     replaceWithEmpty(ui.agentList, "No agent status available yet.");
     return;
@@ -534,14 +555,14 @@ function renderAgents(agents) {
   ui.agentList.replaceChildren(fragment);
 }
 
-function renderBeads(beads) {
+function renderBeads(beads: BeadSummary | null) {
   if (!beads) {
     replaceWithEmpty(ui.beadSummary, "Bead polling is waiting for a remote project path.");
     return;
   }
 
   const fragment = document.createDocumentFragment();
-  const rows = [
+  const rows: [string, string][] = [
     ["Total", String(beads.total)],
     ["Open", String(beads.open)],
     ["In Progress", String(beads.inProgress)],
@@ -584,14 +605,14 @@ function renderBeads(beads) {
   ui.beadSummary.replaceChildren(fragment);
 }
 
-function renderActionAvailability(snapshot) {
+function renderActionAvailability(snapshot: DashboardSnapshot) {
   const actionStates = snapshot.actionStates ?? {};
   const supported = new Set(snapshot.actions ?? []);
   const fragment = document.createDocumentFragment();
 
   for (const action of ACTION_ORDER) {
-    const stateForAction = actionStates[action] ?? { enabled: false };
-    const isSupported = supported.has(action);
+    const stateForAction = actionStates[action as keyof typeof actionStates] ?? { enabled: false };
+    const isSupported = supported.has(action as keyof typeof actionStates);
     const enabled = isSupported && stateForAction.enabled;
     const status = enabled ? "ready" : "blocked";
     const reason = !isSupported
@@ -622,7 +643,7 @@ function renderActionAvailability(snapshot) {
   ui.actionAvailability.replaceChildren(fragment);
 }
 
-function renderPromptLibrary(prompts) {
+function renderPromptLibrary(prompts: PromptSummary[]) {
   state.promptCatalog = new Map(prompts.map((prompt) => [prompt.name, prompt]));
 
   const optionFragment = document.createDocumentFragment();
@@ -651,7 +672,7 @@ function renderPromptLibrary(prompts) {
       button.classList.add("prompt-chip-active");
     }
     button.type = "button";
-    button.dataset.promptName = prompt.name;
+    button.dataset["promptName"] = prompt.name;
 
     const name = document.createElement("span");
     name.className = "prompt-chip-name";
@@ -672,7 +693,7 @@ function renderPromptLibrary(prompts) {
 function updatePromptMeta() {
   const selected = ui.promptName.value.trim();
   for (const chip of ui.promptLibrary.querySelectorAll(".prompt-chip")) {
-    const isActive = chip.dataset.promptName === selected;
+    const isActive = (chip as HTMLElement).dataset["promptName"] === selected;
     chip.classList.toggle("prompt-chip-active", isActive);
   }
 
@@ -690,18 +711,19 @@ function updatePromptMeta() {
   ui.promptMeta.textContent = `Phase ${prompt.phase} · Model ${prompt.model} · Effort ${prompt.effort}`;
 }
 
-function renderVpsHealth(vpsHealth) {
+function renderVpsHealth(vpsHealth: VpsHealth | null) {
   if (!vpsHealth) {
     replaceWithEmpty(ui.vpsHealth, "Waiting for VPS health samples.");
     return;
   }
 
   const fragment = document.createDocumentFragment();
-  for (const [label, value] of [
+  const healthRows: [string, string][] = [
     ["Uptime", vpsHealth.uptime],
     ["Memory", vpsHealth.memory],
     ["Disk", vpsHealth.disk],
-  ]) {
+  ];
+  for (const [label, value] of healthRows) {
     const card = document.createElement("article");
     card.className = "health-card";
 
@@ -719,7 +741,7 @@ function renderVpsHealth(vpsHealth) {
   ui.vpsHealth.replaceChildren(fragment);
 }
 
-function renderMail(mail) {
+function renderMail(mail: MailStatus) {
   const callout = document.createElement("article");
   callout.className = mail.available ? "callout" : "callout callout-warning";
 
@@ -734,7 +756,86 @@ function renderMail(mail) {
   ui.mailStatus.replaceChildren(callout);
 }
 
-function syncControls(snapshot) {
+function renderCostPanel(cost: CostSummary): void {
+  const fragment = document.createDocumentFragment();
+
+  const totalRow = document.createElement("article");
+  totalRow.className = "stat-line";
+  const totalLabel = document.createElement("span");
+  totalLabel.textContent = "Total";
+  const totalValue = document.createElement("strong");
+  totalValue.textContent = `$${cost.totalCostUsd.toFixed(4)}`;
+  totalRow.append(totalLabel, totalValue);
+  fragment.append(totalRow);
+
+  for (const [model, amount] of Object.entries(cost.byModel).sort((a, b) => b[1] - a[1])) {
+    const row = document.createElement("article");
+    row.className = "stat-line";
+    const label = document.createElement("span");
+    label.textContent = model;
+    const value = document.createElement("strong");
+    value.textContent = `$${amount.toFixed(4)}`;
+    row.append(label, value);
+    fragment.append(row);
+  }
+
+  if (Object.keys(cost.byPhase).length > 0) {
+    const heading = document.createElement("p");
+    heading.className = "callout-label";
+    heading.textContent = "By phase";
+    fragment.append(heading);
+
+    for (const [phase, amount] of Object.entries(cost.byPhase)) {
+      const row = document.createElement("article");
+      row.className = "stat-line";
+      const label = document.createElement("span");
+      label.textContent = phase;
+      const value = document.createElement("strong");
+      value.textContent = `$${amount.toFixed(4)}`;
+      row.append(label, value);
+      fragment.append(row);
+    }
+  }
+
+  ui.costPanel.replaceChildren(fragment);
+}
+
+async function fetchCost(): Promise<void> {
+  const baseUrl = normalizedBaseUrl();
+  try {
+    const response = await fetch(`${baseUrl}/cost`, { cache: "no-store" });
+    if (!response.ok) return;
+    const cost = await response.json() as CostSummary;
+    renderCostPanel(cost);
+  } catch {
+    // Non-fatal — cost panel stays in last-known state.
+  }
+}
+
+function renderMemoryPanel(snapshot: DashboardSnapshot): void {
+  const fragment = document.createDocumentFragment();
+  const rows: [string, string][] = [
+    ["Session", snapshot.server.sessionName],
+    ["Path", snapshot.server.remoteProjectPath ?? "not configured"],
+    ["Run", snapshot.run ? shortenId(snapshot.run.id) : "—"],
+    ["Phase", snapshot.run?.phase ?? "—"],
+    ["Started", snapshot.run ? formatRelative(snapshot.run.startedAt) : "—"],
+    ["Gate", snapshot.run?.gatePassedAt ? formatRelative(snapshot.run.gatePassedAt) : "Not yet"],
+  ];
+  for (const [label, value] of rows) {
+    const row = document.createElement("article");
+    row.className = "stat-line";
+    const span = document.createElement("span");
+    span.textContent = label;
+    const strong = document.createElement("strong");
+    strong.textContent = value;
+    row.append(span, strong);
+    fragment.append(row);
+  }
+  ui.sessionSummary.replaceChildren(fragment);
+}
+
+function syncControls(snapshot: DashboardSnapshot) {
   const actionStates = snapshot.actionStates ?? {};
 
   const promptEnabled = Boolean(actionStates["prompt.send"]?.enabled);
@@ -760,7 +861,7 @@ function syncControls(snapshot) {
   syncGatePhaseOptions(snapshot.run);
 }
 
-function syncGatePhaseOptions(run) {
+function syncGatePhaseOptions(run: RunSummary | null) {
   const currentIndex = run ? PHASES.indexOf(run.phase) : -1;
 
   for (const option of ui.gatePhase.options) {
@@ -784,7 +885,7 @@ function syncPaneFieldState() {
   }
 }
 
-function summarizeAgents(agents) {
+function summarizeAgents(agents: AgentStatus[]): { active: number; idle: number; stuck: number } {
   const counts = { active: 0, idle: 0, stuck: 0 };
 
   for (const agent of agents) {
@@ -800,13 +901,13 @@ function summarizeAgents(agents) {
   return counts;
 }
 
-function parseVariables(raw) {
-  const variables = {};
-  const invalidLines = [];
+function parseVariables(raw: string): { variables: Record<string, string>; invalidLines: string[] } {
+  const variables: Record<string, string> = {};
+  const invalidLines: string[] = [];
 
   const lines = raw.split("\n");
   for (let index = 0; index < lines.length; index += 1) {
-    const trimmed = lines[index].trim();
+    const trimmed = lines[index]!.trim();
     if (!trimmed || trimmed.startsWith("#")) {
       continue;
     }
@@ -834,14 +935,14 @@ function parseVariables(raw) {
   };
 }
 
-function replaceWithEmpty(container, message) {
+function replaceWithEmpty(container: Element, message: string) {
   const empty = document.createElement("p");
   empty.className = "empty";
   empty.textContent = message;
   container.replaceChildren(empty);
 }
 
-function setWsStatus(label, className) {
+function setWsStatus(label: string, className: string) {
   ui.wsStatus.textContent = label;
   ui.wsStatus.className = `status-pill ${className}`;
 }
@@ -857,20 +958,20 @@ function normalizedBaseUrl() {
   return normalized;
 }
 
-function statusClass(status) {
+function statusClass(status: AgentStatus["status"]) {
   if (status === "active") return "status-live";
   if (status === "stuck") return "status-error";
   return "status-idle";
 }
 
-function formatVelocity(value) {
+function formatVelocity(value: number | undefined) {
   if (typeof value !== "number" || value <= 0) {
     return "warming up";
   }
   return `${value.toFixed(2)}/hr`;
 }
 
-function formatEta(value) {
+function formatEta(value: number | undefined) {
   if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
     return "unknown";
   }
@@ -882,7 +983,7 @@ function formatEta(value) {
   return `${value.toFixed(1)}h`;
 }
 
-function formatTimestamp(value) {
+function formatTimestamp(value: string | undefined) {
   if (!value) {
     return "unknown";
   }
@@ -895,7 +996,7 @@ function formatTimestamp(value) {
   return date.toLocaleString();
 }
 
-function formatRelative(value) {
+function formatRelative(value: string | undefined) {
   if (!value) {
     return "unknown";
   }
@@ -925,14 +1026,14 @@ function formatRelative(value) {
   return `${elapsedDays}d ago (${formatTimestamp(value)})`;
 }
 
-function shortenId(value) {
+function shortenId(value: string | undefined) {
   if (!value) {
     return "—";
   }
   return value.length > 8 ? value.slice(0, 8) : value;
 }
 
-function logAction(message, isError = false) {
+function logAction(message: string, isError = false) {
   const row = document.createElement("article");
   row.className = `log-line${isError ? " log-line-error" : ""}`;
   row.textContent = `${new Date().toLocaleTimeString()} ${isError ? "ERROR" : "INFO"} ${message}`;
@@ -944,14 +1045,14 @@ function logAction(message, isError = false) {
   }
 }
 
-function describeError(error) {
+function describeError(error: unknown) {
   if (error instanceof Error) {
     return error.message;
   }
   return String(error);
 }
 
-function requireElement(selector) {
+function requireElement(selector: string): Element {
   const element = document.querySelector(selector);
   if (!element) {
     throw new Error(`Dashboard element not found: ${selector}`);
