@@ -863,49 +863,110 @@ function deriveGuidance(input: {
   lastError?: string;
 }): WorkflowGuidance {
   if (input.lastError) {
-    return {
-      title: "Attention needed",
-      detail: input.lastError,
-    };
+    return { title: "Attention needed", detail: input.lastError };
   }
 
   if (!input.run) {
     return {
       title: "Start a run first",
-      detail: 'Run `flywheel new "<idea>"` to create a local run record, then reopen the dashboard.',
+      detail: 'Run `flywheel new "<idea>"` to start the planning wizard (multi-model fan-out + synthesis). Then advance the gate to begin.',
     };
   }
 
   if (!input.remoteProjectPath) {
     return {
       title: "Attach the remote project",
-      detail: "The dashboard still cannot infer the remote project path needed for bead polling.",
+      detail: "The dashboard cannot infer the remote project path needed for bead polling. Run `flywheel settings ssh` to configure.",
     };
   }
 
   if (!input.connected) {
     return {
       title: "Restore the SSH link",
-      detail: "Local run state is available, but live remote orchestration data is currently unavailable.",
+      detail: "Local run state is available, but live remote orchestration data is unavailable. Click Reconnect or check your VPS.",
     };
   }
 
-  if (input.run.phase === "swarm" && input.agents.length === 0) {
+  const { run, agents, beads } = input;
+
+  if (run.phase === "plan") {
     return {
-      title: "Spawn or reconnect the swarm",
-      detail: "The current run is in swarm phase, but no agent panes are visible for the active session.",
+      title: "Write your plan",
+      detail: 'Run `flywheel new "<idea>"` to start the planning wizard — parallel multi-model fan-out with synthesis. Then advance the gate to Beads.',
     };
   }
 
-  if (input.beads?.topRecommendation) {
+  if (run.phase === "beads") {
     return {
-      title: `Top bead: ${input.beads.topRecommendation.id}`,
-      detail: input.beads.topRecommendation.title,
+      title: "Generate and refine beads",
+      detail: "Run `flywheel beads generate` to create tasks from plan.md, then `flywheel beads triage` to prioritize. Advance the gate when the bead set looks right.",
+    };
+  }
+
+  if (run.phase === "swarm") {
+    if (agents.length === 0) {
+      return {
+        title: "Start the swarm",
+        detail: "Run `flywheel swarm <n>` to spawn agents via NTM (tmux). Replace <n> with the number of Claude slots you want (e.g. `flywheel swarm 6`).",
+      };
+    }
+
+    const stuckAgents = agents.filter((a) => a.status === "stuck");
+    if (stuckAgents.length > 0) {
+      const paneList = stuckAgents.map((a) => `pane ${a.pane}`).join(", ");
+      return {
+        title: `${stuckAgents.length} agent${stuckAgents.length === 1 ? "" : "s"} stuck`,
+        detail: `${paneList} ${stuckAgents.length === 1 ? "is" : "are"} stuck. Send a prompt to unblock, or pause and restart the session. Use the Prompt Library below.`,
+      };
+    }
+
+    if (beads && beads.open === 0 && beads.inProgress === 0 && beads.closed > 0) {
+      return {
+        title: "Beads complete — advance to review",
+        detail: `All ${beads.closed} beads are closed. Review the work, then advance the gate to start review passes.`,
+      };
+    }
+
+    if (beads) {
+      const etaPart =
+        typeof beads.etaHours === "number" && beads.etaHours > 0
+          ? ` · ETA ${beads.etaHours < 1 ? `${Math.round(beads.etaHours * 60)}m` : `${beads.etaHours.toFixed(1)}h`}`
+          : "";
+      const title = `${agents.length} agent${agents.length === 1 ? "" : "s"} running · ${beads.closed}/${beads.total} beads${etaPart}`;
+      const detail = beads.topRecommendation
+        ? `Top pick: ${beads.topRecommendation.id} — ${beads.topRecommendation.title}`
+        : "Agents are working. Monitor for stuck panes and send prompts as needed.";
+      return { title, detail };
+    }
+
+    return {
+      title: `${agents.length} agent${agents.length === 1 ? "" : "s"} running`,
+      detail: "Bead data is loading. Monitor for stuck panes and send prompts as needed.",
+    };
+  }
+
+  if (run.phase === "review") {
+    if (agents.length === 0) {
+      return {
+        title: "Start review",
+        detail: "Run `flywheel swarm <n>` to spawn agents via NTM, then send fresh-review or peer-review prompts from the library below.",
+      };
+    }
+    return {
+      title: "Review in progress",
+      detail: `${agents.length} agent${agents.length === 1 ? "" : "s"} running. Send fresh-review, peer-review, or ubs-scan prompts. Advance the gate when review passes are complete.`,
+    };
+  }
+
+  if (run.phase === "deploy") {
+    return {
+      title: "Ready to deploy",
+      detail: 'Run `flywheel deploy` from the CLI. You will need to type DEPLOY <project-name> to confirm. This is the final phase.',
     };
   }
 
   return {
-    title: `Phase: ${input.run.phase}`,
+    title: `Phase: ${run.phase}`,
     detail: "The dashboard is live. Use prompts, gate controls, and agent activity to steer the current run.",
   };
 }

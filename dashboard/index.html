@@ -11,102 +11,92 @@
     <div class="ambient ambient-two"></div>
 
     <main class="app-shell">
-      <header class="topbar card">
-        <div class="topbar-copy">
-          <p class="eyebrow">Agent Flywheel Console</p>
-          <h1>Orchestration cockpit</h1>
-          <p class="lede">
-            A local control surface for the full remote coding flywheel: understand run state,
-            steer prompts, and keep human gates explicit.
-          </p>
+
+      <!-- ── Status bar ──────────────────────────────────────────── -->
+      <header class="status-bar card">
+        <div class="status-bar-left">
+          <span class="status-bar-title">Flywheel Console</span>
+          <span id="ws-status" class="status-pill status-idle">Connecting</span>
+          <span id="run-badge" class="status-pill status-subtle">No run</span>
         </div>
-
-        <div class="topbar-ops">
-          <div class="panel-label-row">
-            <span class="section-kicker">Control link</span>
-            <span id="ws-status" class="status-pill status-idle">Connecting</span>
-          </div>
-
-          <label class="field compact-field">
-            <span>Server URL</span>
-            <input id="server-url" type="text" value="http://127.0.0.1:4200" />
-          </label>
-
-          <div class="button-row">
-            <button id="reconnect-button" class="button button-primary">Reconnect</button>
-            <button id="refresh-button" class="button">Refresh</button>
-          </div>
-
-          <p id="server-meta" class="microcopy">Waiting for snapshot…</p>
+        <div class="status-bar-center">
+          <div id="workflow-rail" class="workflow-rail-inline"></div>
+        </div>
+        <div class="status-bar-right">
+          <span id="metric-ssh" class="status-bar-dot">—</span>
+          <span id="metric-host" class="status-bar-meta">—</span>
+          <span id="server-meta" class="status-bar-meta">—</span>
+        </div>
+        <!-- Hidden metric containers required by Playwright E2E -->
+        <div class="sr-only" aria-hidden="true">
+          <span id="metric-run"></span>
+          <span id="metric-project"></span>
+          <span id="metric-phase"></span>
+          <span id="metric-phase-meta"></span>
+          <span id="metric-agents"></span>
+          <span id="metric-agent-breakdown"></span>
+          <span id="metric-beads"></span>
+          <span id="metric-top-pick"></span>
+          <span id="metric-velocity"></span>
+          <span id="metric-prompts"></span>
+          <span id="metric-session"></span>
         </div>
       </header>
 
-      <section class="hero-grid">
-        <article class="hero-callout card card-accent">
-          <div class="panel-label-row">
-            <span class="section-kicker">Operator guidance</span>
-            <span id="run-badge" class="status-pill status-subtle">No run</span>
+      <!-- ── Command center ─────────────────────────────────────── -->
+      <section class="command-center card card-accent">
+        <div class="command-left">
+          <div class="command-guidance">
+            <p class="section-kicker">What to do now</p>
+            <h2 id="guidance-title">Loading…</h2>
+            <p id="guidance-detail" class="guidance-detail">Waiting for snapshot.</p>
           </div>
-          <h2 id="guidance-title">Loading dashboard context</h2>
-          <p id="guidance-detail" class="lede-small">Waiting for the first snapshot from the local server.</p>
-          <div id="workflow-rail" class="workflow-rail"></div>
-        </article>
-
-        <section class="metrics-grid">
-          <article class="metric-card card">
-            <p class="metric-label">Run</p>
-            <p id="metric-run" class="metric-value">—</p>
-            <p id="metric-project" class="metric-note">Project —</p>
-          </article>
-
-          <article class="metric-card card">
-            <p class="metric-label">Phase</p>
-            <p id="metric-phase" class="metric-value">—</p>
-            <p id="metric-phase-meta" class="metric-note">Gate state unavailable</p>
-          </article>
-
-          <article class="metric-card card">
-            <p class="metric-label">SSH</p>
-            <p id="metric-ssh" class="metric-value">Unknown</p>
-            <p id="metric-host" class="metric-note">Host —</p>
-          </article>
-
-          <article class="metric-card card">
-            <p class="metric-label">Swarm</p>
-            <p id="metric-agents" class="metric-value">0</p>
-            <p id="metric-agent-breakdown" class="metric-note">active 0 · idle 0 · stuck 0</p>
-          </article>
-
-          <article class="metric-card card">
-            <p class="metric-label">Beads</p>
-            <p id="metric-beads" class="metric-value">—</p>
-            <p id="metric-top-pick" class="metric-note">Top pick unavailable</p>
-            <p id="metric-velocity" class="metric-note">Velocity unavailable</p>
-          </article>
-
-          <article class="metric-card card">
-            <p class="metric-label">Prompts</p>
-            <p id="metric-prompts" class="metric-value">0</p>
-            <p id="metric-session" class="metric-note">Session —</p>
-          </article>
-        </section>
+          <div class="bead-progress hidden" id="bead-progress">
+            <div class="bead-progress-track">
+              <div class="bead-progress-fill" id="bead-progress-fill"></div>
+            </div>
+            <p class="bead-progress-label" id="bead-progress-label"></p>
+          </div>
+        </div>
+        <div class="command-right">
+          <div class="primary-action hidden" id="primary-action">
+            <p class="section-kicker">Advance gate</p>
+            <form id="gate-form" class="gate-form-inline">
+              <select id="gate-phase" class="gate-select">
+                <option value="beads">beads</option>
+                <option value="swarm">swarm</option>
+                <option value="review">review</option>
+                <option value="deploy">deploy</option>
+              </select>
+              <input id="gate-checkpoint" type="text" placeholder="SHA (optional)" class="gate-sha" />
+              <button id="gate-submit" class="button button-primary gate-cta" type="submit">Advance →</button>
+            </form>
+            <p id="gate-note" class="microcopy">Waiting for run context…</p>
+          </div>
+          <div class="no-action-hint" id="no-action-hint">
+            <p class="section-kicker">Gate advance</p>
+            <p class="microcopy" id="gate-note-disabled">Complete the current phase to advance.</p>
+          </div>
+        </div>
       </section>
 
+      <!-- ── Error banner ───────────────────────────────────────── -->
       <section id="error-banner" class="error-banner hidden"></section>
 
-      <section class="content-grid">
-        <article class="card tall-card">
+      <!-- ── Ops grid (agents + beads) ─────────────────────────── -->
+      <section class="ops-grid">
+        <article class="card ops-card">
           <div class="panel-header">
             <div>
               <p class="section-kicker">Live activity</p>
-              <h3>Agent status</h3>
+              <h3>Agents</h3>
             </div>
             <p id="agents-updated" class="panel-meta">No data yet</p>
           </div>
           <div id="agent-list" class="stack"></div>
         </article>
 
-        <article class="card">
+        <article class="card ops-card">
           <div class="panel-header">
             <div>
               <p class="section-kicker">Board pulse</p>
@@ -116,171 +106,114 @@
           </div>
           <div id="bead-summary" class="stack"></div>
         </article>
+      </section>
 
-        <article class="card">
-          <div class="panel-header">
-            <div>
-              <p class="section-kicker">Capabilities</p>
-              <h3>Action readiness</h3>
-            </div>
-            <p class="panel-meta">What the dashboard can safely do right now</p>
-          </div>
-          <div id="action-availability" class="stack"></div>
-        </article>
-
+      <!-- ── Tools row (prompts + log) ─────────────────────────── -->
+      <section class="tools-row">
         <article class="card">
           <div class="panel-header">
             <div>
               <p class="section-kicker">Prompt library</p>
-              <h3>Available prompts</h3>
+              <h3>Send a prompt</h3>
             </div>
-            <p id="prompt-library-meta" class="panel-meta">Loading prompts…</p>
+            <p id="prompt-library-meta" class="panel-meta">Loading…</p>
           </div>
           <div id="prompt-library" class="chip-grid"></div>
-        </article>
-
-        <article class="card">
-          <div class="panel-header">
-            <div>
-              <p class="section-kicker">Remote health</p>
-              <h3>VPS checks</h3>
-            </div>
-            <p class="panel-meta">Remote shell telemetry</p>
-          </div>
-          <div id="vps-health" class="stack stack-tight"></div>
-        </article>
-
-        <article class="card">
-          <div class="panel-header">
-            <div>
-              <p class="section-kicker">Coordination</p>
-              <h3>Agent Mail</h3>
-            </div>
-            <p class="panel-meta">Mail integration status</p>
-          </div>
-          <div id="mail-status" class="stack"></div>
-        </article>
-
-        <article class="card">
-          <div class="panel-header">
-            <div>
-              <p class="section-kicker">API spend</p>
-              <h3>Cost tracker</h3>
-            </div>
-            <p class="panel-meta">Running total for the active run</p>
-          </div>
-          <div id="cost-panel" class="stack"></div>
-        </article>
-      </section>
-
-      <section class="controls-grid">
-        <article class="card span-two">
-          <div class="panel-header">
-            <div>
-              <p class="section-kicker">Prompt injection</p>
-              <h3>Send a named prompt</h3>
-            </div>
-            <p id="prompt-meta" class="panel-meta">Select a prompt to see its routing metadata.</p>
-          </div>
-
-          <form id="prompt-form" class="stack">
-            <div class="two-up">
-              <label class="field">
+          <form id="prompt-form" class="stack prompt-form-compact">
+            <div class="prompt-form-row">
+              <label class="field field-compact">
                 <span>Prompt name</span>
                 <input id="prompt-name" type="text" list="prompt-options" placeholder="fresh-review" required />
                 <datalist id="prompt-options"></datalist>
               </label>
-
-              <label class="field">
-                <span>Prompt variables</span>
-                <textarea
-                  id="prompt-vars"
-                  rows="4"
-                  placeholder="plan_path=/tmp/plan.md&#10;bead_id=agent-flywheel-console-8dp.2"
-                ></textarea>
-              </label>
-            </div>
-
-            <div class="three-up">
-              <label class="field">
+              <label class="field field-compact">
                 <span>Target pane</span>
                 <input id="prompt-pane" type="number" min="1" placeholder="4" />
               </label>
-
-              <label class="checkbox checkbox-card">
+              <label class="checkbox checkbox-card checkbox-compact">
                 <input id="prompt-all" type="checkbox" />
-                <span>Broadcast to every pane in the session</span>
+                <span>Broadcast</span>
               </label>
-
-              <div class="inline-summary">
-                <p class="inline-summary-label">Target session</p>
-                <p id="session-summary" class="inline-summary-value">—</p>
-              </div>
             </div>
-
-            <div class="button-row">
+            <label class="field">
+              <span>Variables</span>
+              <textarea id="prompt-vars" rows="2" placeholder="plan_path=/tmp/plan.md"></textarea>
+            </label>
+            <div class="prompt-form-footer">
+              <p id="prompt-meta" class="microcopy">Select a prompt above.</p>
               <button id="prompt-submit" class="button button-primary" type="submit">Send prompt</button>
             </div>
+            <!-- Hidden session summary required by E2E -->
+            <span id="session-summary" class="sr-only"></span>
           </form>
         </article>
 
         <article class="card">
           <div class="panel-header">
             <div>
-              <p class="section-kicker">Swarm controls</p>
-              <h3>Pause or resume</h3>
+              <p class="section-kicker">Recent responses</p>
+              <h3>Action log</h3>
             </div>
-            <p class="panel-meta">Use only when the active session really needs intervention</p>
           </div>
-
-          <div class="stack">
-            <button id="pause-button" class="button button-warn">Pause swarm</button>
-            <button id="resume-button" class="button">Resume swarm</button>
-            <p id="swarm-controls-note" class="microcopy">Waiting for capabilities…</p>
-          </div>
-        </article>
-
-        <article class="card">
-          <div class="panel-header">
-            <div>
-              <p class="section-kicker">Human gate</p>
-              <h3>Advance the run</h3>
-            </div>
-            <p class="panel-meta">This mutates local flywheel run state</p>
-          </div>
-
-          <form id="gate-form" class="stack">
-            <label class="field">
-              <span>Next phase</span>
-              <select id="gate-phase">
-                <option value="beads">beads</option>
-                <option value="swarm">swarm</option>
-                <option value="review">review</option>
-                <option value="deploy">deploy</option>
-              </select>
-            </label>
-
-            <label class="field">
-              <span>Checkpoint SHA</span>
-              <input id="gate-checkpoint" type="text" placeholder="optional" />
-            </label>
-
-            <button id="gate-submit" class="button button-primary" type="submit">Advance gate</button>
-            <p id="gate-note" class="microcopy">Waiting for run context…</p>
-          </form>
+          <div id="action-log" class="log"></div>
         </article>
       </section>
 
-      <section class="card">
-        <div class="panel-header">
-          <div>
-            <p class="section-kicker">Recent responses</p>
-            <h3>Action log</h3>
-          </div>
-          <p class="panel-meta">Latest dashboard events and command outcomes</p>
+      <!-- ── System panel (collapsible) ────────────────────────── -->
+      <details class="system-panel card">
+        <summary class="system-summary">
+          <span class="section-kicker">System</span>
+          <span class="system-summary-meta">VPS · Mail · Swarm controls · Server config</span>
+        </summary>
+
+        <div class="system-grid">
+
+          <article class="system-section">
+            <p class="section-kicker">Swarm controls</p>
+            <div class="stack">
+              <button id="pause-button" class="button button-warn">Pause swarm</button>
+              <button id="resume-button" class="button">Resume swarm</button>
+              <p id="swarm-controls-note" class="microcopy">Waiting for capabilities…</p>
+            </div>
+          </article>
+
+          <article class="system-section">
+            <p class="section-kicker">Remote health</p>
+            <div id="vps-health" class="stack stack-tight"></div>
+          </article>
+
+          <article class="system-section">
+            <p class="section-kicker">Agent Mail</p>
+            <div id="mail-status" class="stack"></div>
+          </article>
+
+          <article class="system-section">
+            <p class="section-kicker">Action readiness</p>
+            <div id="action-availability" class="stack"></div>
+          </article>
+
+          <article class="system-section">
+            <p class="section-kicker">API spend</p>
+            <div id="cost-panel" class="stack"></div>
+          </article>
+
+          <article class="system-section">
+            <p class="section-kicker">Server config</p>
+            <div class="stack">
+              <label class="field compact-field">
+                <span>Server URL</span>
+                <input id="server-url" type="text" value="http://127.0.0.1:4200" />
+              </label>
+              <div class="button-row">
+                <button id="reconnect-button" class="button button-primary">Reconnect</button>
+                <button id="refresh-button" class="button">Refresh</button>
+              </div>
+            </div>
+          </article>
+
         </div>
-        <div id="action-log" class="log"></div>
-      </section>
+      </details>
+
     </main>
 
     <script type="module" src="./main.js"></script>

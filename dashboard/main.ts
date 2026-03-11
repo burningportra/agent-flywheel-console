@@ -87,6 +87,12 @@ const ui = {
   gateCheckpoint: requireElement("#gate-checkpoint") as HTMLInputElement,
   gateSubmit: requireElement("#gate-submit") as HTMLButtonElement,
   gateNote: requireElement("#gate-note") as HTMLElement,
+  beadProgress: requireElement("#bead-progress") as HTMLElement,
+  beadProgressFill: requireElement("#bead-progress-fill") as HTMLElement,
+  beadProgressLabel: requireElement("#bead-progress-label") as HTMLElement,
+  primaryAction: requireElement("#primary-action") as HTMLElement,
+  noActionHint: requireElement("#no-action-hint") as HTMLElement,
+  gateNoteDisabled: requireElement("#gate-note-disabled") as HTMLElement,
 };
 
 initialize();
@@ -429,6 +435,7 @@ function applySnapshot(snapshot: DashboardSnapshot) {
   ui.metricPrompts.textContent = String(snapshot.prompts.length);
   ui.metricSession.textContent = `Session ${snapshot.server.sessionName}`;
   renderMemoryPanel(snapshot);
+  renderBeadProgress(snapshot.beads, snapshot.run?.phase);
 
   if (snapshot.beads) {
     ui.metricBeads.textContent = `${snapshot.beads.closed}/${snapshot.beads.total}`;
@@ -812,6 +819,16 @@ async function fetchCost(): Promise<void> {
   }
 }
 
+function renderBeadProgress(beads: BeadSummary | null, phase: string | undefined): void {
+  const show = phase === "swarm" && beads !== null && beads.total > 0;
+  ui.beadProgress.classList.toggle("hidden", !show);
+  if (!show || !beads) return;
+
+  const pct = beads.total > 0 ? Math.round((beads.closed / beads.total) * 100) : 0;
+  ui.beadProgressFill.style.width = `${pct}%`;
+  ui.beadProgressLabel.textContent = `${beads.closed}/${beads.total} beads · ${pct}%`;
+}
+
 function renderMemoryPanel(snapshot: DashboardSnapshot): void {
   const fragment = document.createDocumentFragment();
   const rows: [string, string][] = [
@@ -847,6 +864,10 @@ function syncControls(snapshot: DashboardSnapshot) {
   ui.pauseButton.disabled = !pauseEnabled;
   ui.resumeButton.disabled = !resumeEnabled;
   ui.gateSubmit.disabled = !gateEnabled;
+
+  // Show gate form in command center only when gate is enabled
+  ui.primaryAction.classList.toggle("hidden", !gateEnabled);
+  ui.noActionHint.classList.toggle("hidden", gateEnabled);
 
   ui.swarmControlsNote.textContent =
     actionStates["swarm.pause"]?.reason ?? actionStates["swarm.resume"]?.reason ?? "Swarm controls are ready.";
