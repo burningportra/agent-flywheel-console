@@ -9,6 +9,7 @@ config/ssh.yaml
 
 # Dashboard build output
 dashboard/dist/
+dashboard/main.js
 
 # OS
 .DS_Store

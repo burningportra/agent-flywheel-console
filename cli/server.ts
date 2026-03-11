@@ -562,9 +562,8 @@ export class FlywheelServer {
       return;
     }
 
-    if (request.method === "GET" && (request.url === "/main.js" || request.url === "/main.ts")) {
-      const assetName = request.url === "/main.ts" ? "main.ts" : "main.js";
-      void this.respondDashboardAsset(response, assetName, "application/javascript; charset=utf-8");
+    if (request.method === "GET" && request.url === "/main.js") {
+      void this.respondDashboardAsset(response, "main.js", "application/javascript; charset=utf-8");
       return;
     }
 

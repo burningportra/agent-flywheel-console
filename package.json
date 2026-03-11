@@ -10,7 +10,7 @@
     "dev": "tsx cli/index.ts",
     "build": "esbuild cli/index.ts --bundle --platform=node --target=node20 --outfile=dist/cli.js --format=esm --packages=external",
     "dashboard": "vite dashboard",
-    "build:dashboard": "vite build dashboard",
+    "build:dashboard": "esbuild dashboard/main.ts --bundle=false --platform=browser --target=es2022 --outfile=dashboard/main.js",
     "serve": "tsx cli/index.ts serve",
     "typecheck": "tsc --noEmit",
     "typecheck:dashboard": "tsc --project dashboard/tsconfig.json",
